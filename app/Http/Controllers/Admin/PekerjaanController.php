@@ -118,7 +118,6 @@ class PekerjaanController extends Controller
             return back()->withErrors(['jenis_pekerjaan_id' => 'Jenis pekerjaan tidak valid untuk tim Anda.']);
         }
 
-        // PERBAIKAN: Gunakan logika yang sama seperti method store()
         $pemberi = $pegawai->nama ?? auth()->user()->name ?? 'Tidak diketahui';
 
         $tugas->update([
@@ -126,7 +125,7 @@ class PekerjaanController extends Controller
             'jenis_pekerjaan_id' => $request->jenis_pekerjaan_id,
             'target' => $request->target,
             'satuan' => $request->satuan,
-            'asal' => $pemberi, // PERBAIKAN: Gunakan nama user, bukan nama tim
+            'asal' => $pemberi,
             'deadline' => $request->deadline,
         ]);
 
@@ -176,7 +175,7 @@ class PekerjaanController extends Controller
                     'Jenis Pekerjaan',
                     'Target',
                     'Satuan',
-                    'Pemberi Pekerjaan', // PERBAIKAN: Ubah heading
+                    'Pemberi Pekerjaan',
                     'Deadline'
                 ];
             }
@@ -252,10 +251,10 @@ class PekerjaanController extends Controller
                     'jenis_pekerjaan_id' => $jenisId,
                     'target' => $row['target'] ?? 0,
                     'satuan' => $row['satuan'] ?? '-',
-                    'asal' => $row['pemberi_pekerjaan'] ?? '-', // PERBAIKAN: Sesuaikan dengan heading baru
+                    'asal' => $row['pemberi_pekerjaan'] ?? '-', 
                     'deadline' => $deadline,
                 ]);
-            }
+            }   
         }, $request->file('file'));
 
         return redirect()->route('admin.pekerjaan.index')
