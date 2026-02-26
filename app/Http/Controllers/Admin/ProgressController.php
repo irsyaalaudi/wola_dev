@@ -110,7 +110,10 @@ class ProgressController extends Controller
             'is_approved' => true,
         ]);
 
-        return redirect()->back()->with('success', 'Realisasi berhasil disetujui.');
+        return back()
+            ->with('success', 'Berhasil disetujui')
+            ->with('scroll_to', $id);
+
     }
 
     /**

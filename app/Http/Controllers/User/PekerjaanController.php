@@ -165,7 +165,10 @@ class PekerjaanController extends Controller
 
         RealisasiTugas::create($validated);
 
-        return back()->with('success', 'Realisasi berhasil disimpan.');
+        return back()
+            ->with('success', 'Realisasi berhasil disimpan.')
+            ->with('scroll_to', $tugas_id);
+
     }
 
     public function updateRealisasi(Request $request, $id)

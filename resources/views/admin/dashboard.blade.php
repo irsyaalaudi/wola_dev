@@ -134,11 +134,26 @@
         </table>
     </div>
 
-    {{-- Grafik Realisasi vs Target --}}
-    <div x-show="showChart" x-transition class="bg-white rounded-xl shadow-md border border-gray-200 p-6 mt-6">
-        <h3 class="text-lg font-semibold text-gray-700 mb-4">Realisasi vs Target ({{ $labelBulanTahun }})</h3>
+    {{-- Semua Grafik --}}
+<div x-show="showChart" x-transition class="mt-6 space-y-6">
+
+    {{-- Grafik 1 --}}
+    <div class="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+        <h3 class="text-lg font-semibold text-gray-700 mb-4">
+            Realisasi vs Target ({{ $labelBulanTahun }})
+        </h3>
         <canvas id="grafikRealisasiTarget" height="120"></canvas>
     </div>
+
+    {{-- Grafik 2 --}}
+    <div class="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+        <h3 class="text-lg font-semibold text-gray-700 mb-4">
+            Realisasi vs Target per Pegawai ({{ $labelBulanTahun }})
+        </h3>
+        <canvas id="grafikPerPegawai" height="120"></canvas>
+    </div>
+
+</div>
 
 </div>
 
@@ -149,36 +164,24 @@
 
 {{-- Script Chart.js --}}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<canvas id="grafikRealisasiTarget"></canvas>
 
 <script>
     const ctx = document.getElementById('grafikRealisasiTarget').getContext('2d');
 
-    // ambil data dari Blade
-    const rawLabels = @json($grafikLabels) || [];
+    const namaTugas = @json($grafikLabels) || [];
 
-    // fungsi untuk memecah label menjadi beberapa baris, tiap 5 kata
-    function wrapLabel(label, wordsPerLine) {
-        wordsPerLine = wordsPerLine || 5;
-        if (!label) return [''];
-        var words = label.split(' ');
-        var lines = [];
-        for (var i = 0; i < words.length; i += wordsPerLine) {
-            lines.push(words.slice(i, i + wordsPerLine).join(' '));
-        }
-        return lines;
-    }
-
-    // proses semua label
-    var labels = rawLabels.map(function(item) {
-        return wrapLabel(item, 5);
+    // Buat label A, B, C, D...
+    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const labels = namaTugas.map((_, index) => {
+        return alphabet[index] ?? `X${index+1}`;
     });
 
     new Chart(ctx, {
         type: 'bar',
         data: {
             labels: labels,
-            datasets: [{
+            datasets: [
+                {
                     label: 'Target',
                     data: @json($grafikTarget),
                     backgroundColor: 'rgba(54, 162, 235, 0.6)'
@@ -200,7 +203,7 @@
             scales: {
                 x: {
                     ticks: {
-                        autoSkip: false, // tampilkan semua label
+                        autoSkip: false,
                         maxRotation: 0,
                         minRotation: 0
                     }
@@ -211,6 +214,106 @@
             }
         }
     });
+
+    // ===== BUAT KETERANGAN DI BAWAH GRAFIK =====
+    // ===== BUAT KETERANGAN DI BAWAH GRAFIK =====
+const container = document.createElement('div');
+
+const total = namaTugas.length;
+const columns = 3;
+const rows = Math.ceil(total / columns);
+
+container.className = `mt-4 grid grid-flow-col gap-3 text-sm text-gray-700`;
+container.style.gridTemplateRows = `repeat(${rows}, auto)`;
+
+    namaTugas.forEach((nama, index) => {
+        const row = document.createElement('div');
+        row.innerHTML = `
+            <div class="flex items-start gap-2">
+                <span class="w-6 h-6 flex items-center justify-center rounded-full bg-blue-100 text-blue-700 font-semibold text-xs">
+                    ${labels[index]}
+                </span>
+                <span>${nama}</span>
+            </div>
+        `;
+        container.appendChild(row);
+    });
+
+    document.getElementById('grafikRealisasiTarget').parentNode.appendChild(container);
+</script>
+
+<script>
+    const ctxPegawai = document.getElementById('grafikPerPegawai').getContext('2d');
+
+    const namaPegawai = @json($grafikPegawaiLabels) || [];
+
+    // Buat label A, B, C, D...
+    const alphabetPegawai = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const labelsPegawai = namaPegawai.map((_, index) => {
+        return alphabetPegawai[index] ?? `X${index+1}`;
+    });
+
+    new Chart(ctxPegawai, {
+        type: 'bar',
+        data: {
+            labels: labelsPegawai,
+            datasets: [
+                {
+                    label: 'Target',
+                    data: @json($grafikPegawaiTarget),
+                    backgroundColor: 'rgba(153, 102, 255, 0.6)'
+                },
+                {
+                    label: 'Realisasi',
+                    data: @json($grafikPegawaiRealisasi),
+                    backgroundColor: 'rgba(255, 159, 64, 0.6)'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'top' }
+            },
+            scales: {
+                x: {
+                    ticks: {
+                        autoSkip: false,
+                        maxRotation: 0,
+                        minRotation: 0
+                    }
+                },
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+
+    // ===== BUAT KETERANGAN DI BAWAH GRAFIK =====
+    const containerPegawai = document.createElement('div');
+
+    const totalPegawai = namaPegawai.length;
+    const columnsPegawai = 3;
+    const rowsPegawai = Math.ceil(totalPegawai / columnsPegawai);
+
+    containerPegawai.className = `mt-4 grid grid-flow-col gap-3 text-sm text-gray-700`;
+    containerPegawai.style.gridTemplateRows = `repeat(${rowsPegawai}, auto)`;
+
+    namaPegawai.forEach((nama, index) => {
+        const row = document.createElement('div');
+        row.innerHTML = `
+            <div class="flex items-start gap-2">
+                <span class="w-6 h-6 flex items-center justify-center rounded-full bg-purple-100 text-purple-700 font-semibold text-xs">
+                    ${labelsPegawai[index]}
+                </span>
+                <span>${nama}</span>
+            </div>
+        `;
+        containerPegawai.appendChild(row);
+    });
+
+    document.getElementById('grafikPerPegawai').parentNode.appendChild(containerPegawai);
 </script>
 
 @endsection

@@ -14,6 +14,8 @@ use Maatwebsite\Excel\Concerns\WithStyles;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use Carbon\Carbon;
+use App\Exports\TemplateTugasExport;
+use App\Imports\TugasImport;
 
 class PekerjaanController extends Controller
 {
@@ -205,59 +207,63 @@ class PekerjaanController extends Controller
             }
         }, 'tugas.xlsx');
     }
+/*     
+    public function model(array $row)
+{
+    if (empty($row['pegawai_id']) || empty($row['jenis_pekerjaan_id'])) {
+        return null;
+    }
 
-    public function import(Request $request)
+    // Ambil ID dari string "id - nama"
+    $pegawaiId = explode(' - ', $row['pegawai_id'])[0] ?? null;
+    $jenisId   = explode(' - ', $row['jenis_pekerjaan_id'])[0] ?? null;
+
+    if (!$pegawaiId || !$jenisId) {
+        return null;
+    }
+
+    $jenis = JenisPekerjaan::where('id', $jenisId)
+        ->whereIn('tim_id', $this->teamIds)
+        ->first();
+
+    if (!$jenis) {
+        return null;
+    }
+
+    return new Tugas([
+        'pegawai_id' => $pegawaiId,
+        'jenis_pekerjaan_id' => $jenisId,
+        'target' => $row['target'] ?? 0,
+        'satuan' => $jenis->satuan,
+        'asal' => auth()->user()->pegawai->nama ?? auth()->user()->name,
+        'deadline' => $row['deadline'] ?? null,
+    ]);
+}
+*/
+
+    public function downloadTemplate()
+{
+    return Excel::download(
+        new TemplateTugasExport(auth()->user()),
+        'Template_Tugas.xlsx'
+    );
+}
+public function import(Request $request)
     {
         $request->validate([
-            'file' => 'required|mimes:xlsx,xls,csv'
+            'file' => 'required|mimes:xlsx,xls,csv|max:5120'
         ]);
 
-        $teamIds = auth()->user()->teams->pluck('id');
+        $teamIds = auth()->user()->pegawai?->teams->pluck('id') ?? [];
 
-        Excel::import(new class($teamIds) implements \Maatwebsite\Excel\Concerns\ToModel, \Maatwebsite\Excel\Concerns\WithHeadingRow {
-            protected $teamIds;
-            public function __construct($teamIds)
-            {
-                $this->teamIds = $teamIds;
-            }
+        Excel::import(
+            new TugasImport($teamIds),
+            $request->file('file')
+        );
 
-            public function model(array $row)
-            {
-                $deadline = null;
-                if (!empty($row['deadline'])) {
-                    try {
-                        $deadline = Carbon::createFromFormat('d-m-Y', $row['deadline'])->format('Y-m-d');
-                    } catch (\Exception $e) {
-                        try {
-                            $deadline = Carbon::parse($row['deadline'])->format('Y-m-d');
-                        } catch (\Exception $e) {
-                            $deadline = null;
-                        }
-                    }
-                }
-
-                $pegawaiId = Pegawai::where('nama', $row['pegawai'])
-                    ->whereHas('teams', fn($q) => $q->whereIn('teams.id', $this->teamIds))
-                    ->value('id');
-
-                $jenisId = JenisPekerjaan::where('nama_pekerjaan', $row['jenis_pekerjaan'])
-                    ->whereIn('tim_id', $this->teamIds)
-                    ->value('id');
-
-                if (!$pegawaiId || !$jenisId) return null;
-
-                return new Tugas([
-                    'pegawai_id' => $pegawaiId,
-                    'jenis_pekerjaan_id' => $jenisId,
-                    'target' => $row['target'] ?? 0,
-                    'satuan' => $row['satuan'] ?? '-',
-                    'asal' => $row['pemberi_pekerjaan'] ?? '-', 
-                    'deadline' => $deadline,
-                ]);
-            }   
-        }, $request->file('file'));
-
-        return redirect()->route('admin.pekerjaan.index')
+        return redirect()
+            ->route('admin.pekerjaan.index')
             ->with('success', 'Data tugas berhasil diimport.');
     }
+
 }

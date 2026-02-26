@@ -58,6 +58,7 @@
   </form>
 
   @forelse($tugas as $t)
+  <a id="tugas-{{ $t->id }}"></a>
   <div class="border rounded-lg mb-4 overflow-hidden">
     <div class="bg-blue-500 text-white px-4 py-3 flex justify-between items-center">
       <span class="font-semibold">{{ $t->jenisPekerjaan->nama_pekerjaan ?? '-' }}</span>
@@ -231,4 +232,15 @@
       updateDisableState();
   });
   </script>
+
+@if(session('scroll_to'))
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const el = document.getElementById("tugas-{{ session('scroll_to') }}");
+        if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+    });
+  </script>
+@endif
 @endsection

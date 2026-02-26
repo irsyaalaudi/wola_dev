@@ -109,11 +109,6 @@
                     <i class="fas fa-briefcase w-5"></i>
                     <span class="ml-3">Pekerjaan</span>
                 </a>
-                <a href="{{ route('admin.pegawai.index') }}"
-                    class="{{ request()->routeIs('admin.pegawai.index') ? 'bg-yellow-400 text-blue-900 font-semibold' : 'hover:bg-blue-700' }} flex items-center px-4 py-2 rounded transition">
-                    <i class="fas fa-user w-5"></i>
-                    <span class="ml-3">Pegawai</span>
-                </a>
 
 
                 {{-- Jika admin juga anggota tim, tampilkan menu tambahan --}}
@@ -154,10 +149,10 @@
                     <span class="ml-3">Pekerjaan</span>
                 </a>
 
-                <a href="{{ route('user.pegawai.index') }}"
-                    class="{{ request()->routeIs('user.pegawai.index') ? 'bg-yellow-400 text-blue-900 font-semibold' : 'hover:bg-blue-700' }} flex items-center px-4 py-2 rounded transition">
-                    <i class="fas fa-users w-5"></i>
-                    <span class="ml-3">Pegawai</span>
+                <a href="{{ route('user.support') }}"
+                    class="{{ request()->routeIs('user.support') ? 'bg-yellow-400 text-blue-900 font-semibold' : 'hover:bg-blue-700' }} flex items-center px-4 py-2 rounded transition">
+                    <i class="fas fa-life-ring w-5"></i>
+                    <span class="ml-3">Support</span>
                 </a>
                 @endif
 

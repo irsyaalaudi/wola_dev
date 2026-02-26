@@ -16,89 +16,116 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 class DashboardController extends Controller
 {
     public function index(Request $request)
-    {
-        $userPegawai = auth()->user()->pegawai;
-        if (!$userPegawai) {
-            abort(403, 'Anda tidak memiliki data pegawai.');
-        }
-
-        $teamIds = $userPegawai->teams->pluck('id')->toArray();
-        $bulan   = $request->input('bulan');
-        $tahun   = $request->input('tahun');
-        $search  = trim((string) $request->input('search', ''));
-
-        $namaBulan = [
-            1 => 'Januari',
-            2 => 'Februari',
-            3 => 'Maret',
-            4 => 'April',
-            5 => 'Mei',
-            6 => 'Juni',
-            7 => 'Juli',
-            8 => 'Agustus',
-            9 => 'September',
-            10 => 'Oktober',
-            11 => 'November',
-            12 => 'Desember'
-        ];
-
-        $labelBulanTahun = match (true) {
-            $bulan && $tahun   => strtoupper($namaBulan[(int)$bulan]) . " $tahun",
-            $bulan && !$tahun  => strtoupper($namaBulan[(int)$bulan]) . " - Semua Tahun",
-            !$bulan && $tahun  => "Semua Bulan - $tahun",
-            default            => 'Semua Bulan & Tahun'
-        };
-
-        $members = Pegawai::whereHas('teams', fn($q) => $q->whereIn('teams.id', $teamIds))->get();
-        $memberIds = $members->pluck('id')->toArray();
-
-        // Query tugas
-        $tasksQuery = Tugas::with(['pegawai.teams', 'jenisPekerjaan.team', 'semuaRealisasi'])
-            ->whereIn('pegawai_id', $memberIds)
-            ->where('asal', $userPegawai->nama)
-            ->when($bulan, fn($q) => $q->whereMonth('created_at', $bulan))
-            ->when($tahun, fn($q) => $q->whereYear('created_at', $tahun));
-
-        // Filter search
-        if ($search !== '') {
-            $keywords = preg_split('/[\s,]+/', $search, -1, PREG_SPLIT_NO_EMPTY);
-            $tasksQuery->where(function ($q) use ($keywords) {
-                foreach ($keywords as $word) {
-                    $q->orWhereHas('pegawai', fn($qq) => $qq->where('nama', 'like', "%$word%"))
-                        ->orWhereHas('jenisPekerjaan', fn($qq) => $qq->where('nama_pekerjaan', 'like', "%$word%"));
-                }
-            });
-        }
-
-        $tasks = $tasksQuery->get();
-
-        // Transform tugas
-        $tasks->transform(fn($t) => $this->calculateTask($t));
-
-        $totalTugas      = $tasks->count();
-        $tugasSelesai    = $tasks->where('status', 'Selesai Dikerjakan')->count();
-        $tugasOngoing    = $tasks->where('status', 'Ongoing')->count();
-        $tugasBelum      = $tasks->where('status', 'Belum Dikerjakan')->count();
-        $rataNilaiAkhir  = $totalTugas > 0 ? round($tasks->avg('nilaiAkhir'), 2) : 0;
-
-        $grafikLabels    = $tasks->pluck('jenisPekerjaan.nama_pekerjaan')->toArray();
-        $grafikTarget    = $tasks->pluck('totalTarget')->toArray();
-        $grafikRealisasi = $tasks->pluck('totalRealisasi')->toArray();
-
-        return view('admin.dashboard', compact(
-            'members',
-            'tasks',
-            'totalTugas',
-            'tugasSelesai',
-            'tugasOngoing',
-            'tugasBelum',
-            'rataNilaiAkhir',
-            'grafikLabels',
-            'grafikTarget',
-            'grafikRealisasi',
-            'labelBulanTahun'
-        ));
+{
+    $userPegawai = auth()->user()->pegawai;
+    if (!$userPegawai) {
+        abort(403, 'Anda tidak memiliki data pegawai.');
     }
+
+    $teamIds = $userPegawai->teams->pluck('id')->toArray();
+    $bulan   = $request->input('bulan');
+    $tahun   = $request->input('tahun');
+    $search  = trim((string) $request->input('search', ''));
+
+    $namaBulan = [
+        1 => 'Januari', 2 => 'Februari', 3 => 'Maret',
+        4 => 'April', 5 => 'Mei', 6 => 'Juni',
+        7 => 'Juli', 8 => 'Agustus', 9 => 'September',
+        10 => 'Oktober', 11 => 'November', 12 => 'Desember'
+    ];
+
+    $labelBulanTahun = match (true) {
+        $bulan && $tahun   => strtoupper($namaBulan[(int)$bulan]) . " $tahun",
+        $bulan && !$tahun  => strtoupper($namaBulan[(int)$bulan]) . " - Semua Tahun",
+        !$bulan && $tahun  => "Semua Bulan - $tahun",
+        default            => 'Semua Bulan & Tahun'
+    };
+
+    // =====================
+    // AMBIL MEMBER TIM
+    // =====================
+    $members = Pegawai::whereHas('teams', fn($q) =>
+        $q->whereIn('teams.id', $teamIds)
+    )->get();
+
+    $memberIds = $members->pluck('id')->toArray();
+
+    // =====================
+    // QUERY TUGAS
+    // =====================
+    $tasksQuery = Tugas::with(['pegawai.teams', 'jenisPekerjaan.team', 'semuaRealisasi'])
+        ->whereIn('pegawai_id', $memberIds)
+        ->where('asal', $userPegawai->nama)
+        ->when($bulan, fn($q) => $q->whereMonth('created_at', $bulan))
+        ->when($tahun, fn($q) => $q->whereYear('created_at', $tahun));
+
+    if ($search !== '') {
+        $keywords = preg_split('/[\s,]+/', $search, -1, PREG_SPLIT_NO_EMPTY);
+        $tasksQuery->where(function ($q) use ($keywords) {
+            foreach ($keywords as $word) {
+                $q->orWhereHas('pegawai', fn($qq) =>
+                    $qq->where('nama', 'like', "%$word%"))
+                  ->orWhereHas('jenisPekerjaan', fn($qq) =>
+                    $qq->where('nama_pekerjaan', 'like', "%$word%"));
+            }
+        });
+    }
+
+    $tasks = $tasksQuery->get();
+
+    // =====================
+    // HITUNG NILAI & STATUS
+    // =====================
+    $tasks->transform(fn($t) => $this->calculateTask($t));
+
+    // =====================
+    // STATISTIK
+    // =====================
+    $totalTugas     = $tasks->count();
+    $tugasSelesai   = $tasks->where('status', 'Selesai Dikerjakan')->count();
+    $tugasOngoing   = $tasks->where('status', 'Ongoing')->count();
+    $tugasBelum     = $tasks->where('status', 'Belum Dikerjakan')->count();
+    $rataNilaiAkhir = $totalTugas > 0 ? round($tasks->avg('nilaiAkhir'), 2) : 0;
+
+    // =====================
+    // GRAFIK PER TUGAS
+    // =====================
+    $grafikLabels    = $tasks->pluck('jenisPekerjaan.nama_pekerjaan')->toArray();
+    $grafikTarget    = $tasks->pluck('totalTarget')->toArray();
+    $grafikRealisasi = $tasks->pluck('totalRealisasi')->toArray();
+
+    // =====================
+    // GRAFIK PER PEGAWAI (BARU)
+    // =====================
+    $pegawaiSummary = $tasks->groupBy('pegawai_id')->map(function ($items) {
+        return [
+            'nama' => $items->first()->pegawai->nama ?? '-',
+            'target' => $items->sum('totalTarget'),
+            'realisasi' => $items->sum('totalRealisasi'),
+        ];
+    });
+
+    $grafikPegawaiLabels    = $pegawaiSummary->pluck('nama')->values()->toArray();
+    $grafikPegawaiTarget    = $pegawaiSummary->pluck('target')->values()->toArray();
+    $grafikPegawaiRealisasi = $pegawaiSummary->pluck('realisasi')->values()->toArray();
+
+    return view('admin.dashboard', compact(
+        'members',
+        'tasks',
+        'totalTugas',
+        'tugasSelesai',
+        'tugasOngoing',
+        'tugasBelum',
+        'rataNilaiAkhir',
+        'grafikLabels',
+        'grafikTarget',
+        'grafikRealisasi',
+        'grafikPegawaiLabels',
+        'grafikPegawaiTarget',
+        'grafikPegawaiRealisasi',
+        'labelBulanTahun'
+    ));
+}
 
     public function exportExcel(Request $request)
     {

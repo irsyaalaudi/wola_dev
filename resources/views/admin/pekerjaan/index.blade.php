@@ -31,6 +31,20 @@
         <i class="fas fa-file-excel mr-2"></i> Export Tabel
       </a>
 
+      <a href="{{ route('admin.pekerjaan.template') }}"
+        class="px-4 py-2 rounded-lg border border-blue-500 text-blue-600">
+        Download Template
+      </a>
+
+      <button 
+          onclick="document.getElementById('modalImport').classList.remove('hidden')"
+          class="inline-flex items-center px-4 py-2 rounded-lg border border-purple-500 
+                text-purple-600 font-medium bg-purple-200/20 
+                hover:bg-purple-300/30 hover:border-purple-600 hover:text-purple-700 
+                transition duration-200 transform hover:scale-105">
+          <i class="fas fa-file-import mr-2"></i> Import Excel
+      </button>
+
       {{-- Tambah --}}
       <button @click="tambahModal = true"
         class="inline-flex items-center px-4 py-2 rounded-lg border border-blue-500 text-blue-600 font-medium bg-blue-200/20 hover:bg-blue-300/30 hover:border-blue-600 hover:text-blue-700 transition duration-200 transform hover:scale-105">
@@ -45,6 +59,20 @@
     {{ session('success') }}
   </div>
   @endif
+
+  @if($errors->any())
+<div class="mb-4 bg-red-50 text-red-700 px-4 py-2 rounded-md border border-red-200">
+    {{ $errors->first() }}
+</div>
+@endif
+
+@if($errors->any())
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        document.getElementById('modalImport').classList.remove('hidden');
+    });
+</script>
+@endif
 
   {{-- Tabel --}}
   <div class="overflow-x-auto rounded-xl border border-gray-200 shadow-sm bg-white">
@@ -240,6 +268,37 @@
       </form>
     </div>
   </div>
+        <div id="modalImport"
+        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+        
+        <div class="bg-white rounded-lg shadow-lg w-full max-w-md p-6">
+
+            <h2 class="text-lg font-semibold mb-4">Import Data Tugas</h2>
+
+            <form action="{{ route('admin.pekerjaan.import') }}" 
+                  method="POST" 
+                  enctype="multipart/form-data">
+                @csrf
+
+                <input type="file" name="file" 
+                      class="w-full border rounded px-3 py-2 mb-4"
+                      accept=".xlsx,.xls,.csv" required>
+
+                <div class="flex justify-end gap-2">
+                    <button type="button"
+                        onclick="document.getElementById('modalImport').classList.add('hidden')"
+                        class="bg-gray-300 px-4 py-2 rounded">
+                        Batal
+                    </button>
+
+                    <button type="submit"
+                        class="bg-purple-600 text-white px-4 py-2 rounded">
+                        Import
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 
 <footer class="text-center text-sm text-gray-500 py-4 border-t mt-10">

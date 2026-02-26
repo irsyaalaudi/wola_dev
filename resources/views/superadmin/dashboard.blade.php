@@ -159,11 +159,21 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     const ctx = document.getElementById('targetRealisasiChart').getContext('2d');
+
+    const namaPegawai = @json($chartLabels) || [];
+
+    // Buat label A, B, C, D...
+    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const labels = namaPegawai.map((_, index) => {
+        return alphabet[index] ?? `X${index+1}`;
+    });
+
     new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: @json($chartLabels),
-            datasets: [{
+            labels: labels,
+            datasets: [
+                {
                     label: 'Total Target',
                     data: @json($chartTarget),
                     backgroundColor: 'rgba(54, 162, 235, 0.6)'
@@ -189,5 +199,29 @@
             }
         }
     });
+
+const container = document.createElement('div');
+
+const total = namaPegawai.length;
+const columns = 3;
+const rows = Math.ceil(total / columns);
+
+container.className = `mt-4 grid grid-flow-col gap-3 text-sm text-gray-700`;
+container.style.gridTemplateRows = `repeat(${rows}, auto)`;
+
+namaPegawai.forEach((nama, index) => {
+    const row = document.createElement('div');
+    row.innerHTML = `
+        <div class="flex items-start gap-2">
+            <span class="w-6 h-6 flex items-center justify-center rounded-full bg-blue-100 text-blue-700 font-semibold text-xs">
+                ${labels[index]}
+            </span>
+            <span>${nama}</span>
+        </div>
+    `;
+    container.appendChild(row);
+});
+
+document.getElementById('targetRealisasiChart').parentNode.appendChild(container);
 </script>
 @endsection

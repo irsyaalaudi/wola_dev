@@ -58,6 +58,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     Route::get('progress/export', [AdminProgressController::class, 'export'])->name('progress.export');
     Route::get('/support', [AdminSupportController::class, 'index'])->name('support');
     Route::patch('/progress/{id}/approve', [AdminProgressController::class, 'approve'])->name('progress.approve');
+    Route::get('pekerjaan/template', [AdminPekerjaanController::class, 'downloadTemplate'])
+     ->name('pekerjaan.template');
+
 });
 
 
