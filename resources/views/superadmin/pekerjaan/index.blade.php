@@ -3,7 +3,7 @@
 @section('page-title', 'Pekerjaan')
 
 @section('content')
-<div class="bg-white rounded-2xl p-6 mb-12 border border-gray-200">
+<div class="bg-white rounded-2xl p-6 mb-12 border border-gray-200 w-full md:w-[1600px]">
   <h2 class="text-2xl font-semibold text-blue-600">Data Progres Pekerjaan</h2>
 
   <!-- Progress Bar -->
@@ -40,7 +40,7 @@
 </div>
 
 <!-- Tabel Pekerjaan -->
-<div class="bg-white rounded-xl p-6 border border-gray-200">
+<div class="bg-white rounded-xl p-6 border border-gray-200 md:w-[1600px]">
   <h2 class="text-2xl font-semibold text-blue-600">Tabel Pekerjaan</h2>
 
   <!-- Filter Form -->
@@ -154,7 +154,7 @@
 </div>
 <!-- Footer Pagination -->
 @if ($tugas->hasPages())
-<div class="flex items-center justify-between border-t border-white/10 px-4 py-3 sm:px-6">
+<div class="flex items-center justify-between border-t border-white/10 px-4 py-3 sm:px-6 md:w-[1600px]">
   <!-- Mobile Previous/Next -->
   <div class="flex flex-1 justify-between sm:hidden">
     @if ($tugas->onFirstPage())
@@ -203,13 +203,32 @@
         @endif
 
         {{-- Nomor Halaman --}}
-        @foreach ($tugas->getUrlRange(1, $tugas->lastPage()) as $page => $url)
-        @if ($page == $tugas->currentPage())
-        <span aria-current="page" class="relative z-10 inline-flex items-center bg-blue-700 px-4 py-2 text-sm font-semibold text-white">{{ $page }}</span>
-        @else
-        <a href="{{ $url }}" class="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-400 hover:bg-white/5">{{ $page }}</a>
+        @php
+            $currentPage = $tugas->currentPage();
+            $lastPage = $tugas->lastPage();
+            $window = 2; 
+        @endphp
+
+        {{-- Halaman 1 --}}
+        @if($currentPage > $window + 2)
+            <a href="{{ $tugas->url(1) }}" class="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-400 hover:bg-white/5">1</a>
+            <span class="relative inline-flex items-center px-2 py-2 text-sm text-gray-400">...</span>
         @endif
-        @endforeach
+
+        {{-- Halaman window --}}
+        @for($page = max(1, $currentPage - $window); $page <= min($lastPage, $currentPage + $window); $page++)
+            @if($page == $currentPage)
+                <span aria-current="page" class="relative z-10 inline-flex items-center bg-blue-700 px-4 py-2 text-sm font-semibold text-white">{{ $page }}</span>
+            @else
+                <a href="{{ $tugas->url($page) }}" class="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-400 hover:bg-white/5">{{ $page }}</a>
+            @endif
+        @endfor
+
+        {{-- Halaman terakhir --}}
+        @if($currentPage < $lastPage - $window - 1)
+            <span class="relative inline-flex items-center px-2 py-2 text-sm text-gray-400">...</span>
+            <a href="{{ $tugas->url($lastPage) }}" class="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-400 hover:bg-white/5">{{ $lastPage }}</a>
+        @endif
 
         {{-- Tombol Next --}}
         @if ($tugas->hasMorePages())

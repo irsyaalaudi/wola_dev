@@ -20,12 +20,16 @@ class ProgressController extends Controller
     {
         $teamIds = DB::table('pegawai_team')
             ->where('pegawai_id', auth()->user()->pegawai_id)
+            ->where('is_leader', 1)
             ->pluck('team_id')
             ->toArray();
 
         $search = $request->input('search');
 
         $tugas = Tugas::with(['pegawai.teams', 'jenisPekerjaan.team', 'semuaRealisasi'])
+            ->whereHas('jenisPekerjaan', function ($q) use ($teamIds) {
+                $q->whereIn('tim_id', $teamIds);
+            })
             ->whereHas('pegawai', function ($q) use ($teamIds, $search) {
                 $q->whereIn('id', function ($qq) use ($teamIds) {
                     $qq->select('pegawai_id')
@@ -65,7 +69,6 @@ class ProgressController extends Controller
                     $status = 'Selesai Dikerjakan';
                 }
 
-                // Nama Tim pemberi tugas
                 $namaTim = $t->jenisPekerjaan->team->nama_tim ?? '-';
 
                 return [
@@ -157,13 +160,41 @@ class ProgressController extends Controller
 
                         $bobot = $t->jenisPekerjaan->bobot ?? 0;
 
-                        $lastDate = $t->semuaRealisasi->max('tanggal_realisasi');
-                        $hariTelat = 0;
-                        if ($lastDate && Carbon::parse($lastDate)->gt(Carbon::parse($t->deadline))) {
-                            $hariTelat = Carbon::parse($lastDate)->diffInDays(Carbon::parse($t->deadline));
+                        // keterlambatan
+                        $realisasiSortir = $t->semuaRealisasi->sortBy('tanggal_realisasi');
+                        $akumulasiCek = 0;
+                        $tanggalSelesai = null;
+                        foreach ($realisasiSortir as $r) {
+                            $akumulasiCek += $r->realisasi;
+                            if ($akumulasiCek >= $t->target) {
+                                $tanggalSelesai = $r->tanggal_realisasi;
+                                break;
+                            }
                         }
 
-                        $penalti = $bobot * 0.1 * $hariTelat;
+                        // Sudah selesai tepat waktu = selesai sebelum atau tepat deadline
+                        $selesaiTepat = $tanggalSelesai && !Carbon::parse($tanggalSelesai)->gt(Carbon::parse($t->deadline));
+
+                        $hariTelat = 0;
+                        $penalti = 0;
+
+                        if (!$selesaiTepat) {
+                            $realisasiTelat = $realisasiSortir->first(function ($r) use ($t) {
+                                return Carbon::parse($r->tanggal_realisasi)->gt(Carbon::parse($t->deadline));
+                            });
+
+                            if ($realisasiTelat) {
+                                $hariTelat = Carbon::parse($t->deadline)
+                                    ->diffInDays(Carbon::parse($realisasiTelat->tanggal_realisasi));
+                            } elseif ($totalRealisasi < $t->target) {
+                                if (Carbon::now()->gt(Carbon::parse($t->deadline))) {
+                                    $hariTelat = Carbon::parse($t->deadline)->diffInDays(Carbon::now());
+                                }
+                            }
+
+                            // Penalti 5% per hari keterlambatan dikalikan bobot
+                            $penalti = $bobot * 0.05 * $hariTelat;
+                        }
                         $nilaiAkhir = max(0, ($bobot * $progress) - $penalti);
 
                         $namaTim = $t->jenisPekerjaan->team->nama_tim ?? '-';
@@ -177,7 +208,7 @@ class ProgressController extends Controller
                             'Nama Tugas'    => $t->jenisPekerjaan->nama_pekerjaan ?? '-',
                             'Target'        => $t->target,
                             'Realisasi'     => $totalRealisasi,
-                            'Bobot'         => $bobot,
+                            'Bobot'         => $bobot,  
                             'Hari Telat'    => $hariTelat,
                             'Nilai Akhir'   => round($nilaiAkhir, 2),
                             'Bukti'         => $fileBuktiUrl,

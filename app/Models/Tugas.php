@@ -12,7 +12,8 @@ class Tugas extends Model
         'target',
         'asal',
         'satuan',
-        'deadline'
+        'deadline',
+        'created_at',
     ];
 
     public function jenisPekerjaan()

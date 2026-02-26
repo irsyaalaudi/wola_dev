@@ -78,7 +78,7 @@
 
     {{-- Tabel Pegawai --}}
     <div x-show="showTable" x-transition class="mb-6">
-        <div class="table-wrapper w-full md:w-[1600px]"> {{-- bisa atur width sesuai kebutuhan --}}
+        <div class="table-wrapper w-full md:w-[1600px]">
     <div class="md-card-content overflow-x-auto">
         <table class="table-auto text-sm text-gray-700 border-collapse min-w-max">
             <thead class="bg-gradient-to-r from-blue-100 to-blue-200 text-gray-700 text-center">

@@ -31,13 +31,23 @@ class PekerjaanController extends Controller
             });
         }
 
-        // Filter deadline
-        if ($request->filled('deadline_start') && $request->filled('deadline_end')) {
-            $tugasQuery->whereBetween('deadline', [$request->deadline_start, $request->deadline_end]);
-        } elseif ($request->filled('deadline_start')) {
-            $tugasQuery->where('deadline', '>=', $request->deadline_start);
-        } elseif ($request->filled('deadline_end')) {
-            $tugasQuery->where('deadline', '<=', $request->deadline_end);
+        // Filter bulan
+        if ($request->filled('bulan')) {
+            $tugasQuery->whereMonth('deadline', $request->bulan);
+        }
+
+        // Filter Tahun
+        if ($request->filled('tahun')) {
+            $tugasQuery->whereYear('deadline', $request->tahun);
+        }
+
+        // Filter Waktu
+        if ($request->filled('start_date') && $request->filled('end_date')) {
+            $tugasQuery->whereBetween('deadline', [$request->start_date, $request->end_date]);
+        } elseif ($request->filled('start_date')) {
+            $tugasQuery->where('deadline', '>=', $request->start_date);
+        } elseif ($request->filled('end_date')) {
+            $tugasQuery->where('deadline', '<=', $request->end_date);
         }
 
         $tugas = $tugasQuery->get();
@@ -45,20 +55,46 @@ class PekerjaanController extends Controller
         foreach ($tugas as $t) {
             // total realisasi & progress
             $totalRealisasi = $t->semuaRealisasi->sum('realisasi');
-            $progress = $t->target > 0 ? min($totalRealisasi / $t->target, 1) : 0;
+            $progress = $t->target > 0 ? ($totalRealisasi / $t->target) : 0;
 
             // bobot dari jenis pekerjaan
             $bobot = $t->jenisPekerjaan->bobot ?? 0;
 
-            // keterlambatan (hari telat berdasarkan realisasi terakhir)
-            $lastDate = $t->semuaRealisasi->max('tanggal_realisasi');
-            $hariTelat = 0;
-            if ($lastDate && Carbon::parse($lastDate)->gt(Carbon::parse($t->deadline))) {
-                $hariTelat = Carbon::parse($lastDate)->diffInDays(Carbon::parse($t->deadline));
+            // keterlambatan
+            $realisasiSortir = $t->semuaRealisasi->sortBy('tanggal_realisasi');
+            $akumulasiCek = 0;
+            $tanggalSelesai = null;
+            foreach ($realisasiSortir as $r) {
+                $akumulasiCek += $r->realisasi;
+                if ($akumulasiCek >= $t->target) {
+                    $tanggalSelesai = $r->tanggal_realisasi;
+                    break;
+                }
             }
 
-            // penalti 10% per hari keterlambatan
-            $penalti = $bobot * 0.1 * $hariTelat;
+            // Sudah selesai tepat waktu = selesai sebelum atau tepat deadline
+            $selesaiTepat = $tanggalSelesai && !Carbon::parse($tanggalSelesai)->gt(Carbon::parse($t->deadline));
+
+            $hariTelat = 0;
+            $penalti = 0;
+
+            if (!$selesaiTepat) {
+                $realisasiTelat = $realisasiSortir->first(function ($r) use ($t) {
+                    return Carbon::parse($r->tanggal_realisasi)->gt(Carbon::parse($t->deadline));
+                });
+
+                if ($realisasiTelat) {
+                    $hariTelat = Carbon::parse($t->deadline)
+                        ->diffInDays(Carbon::parse($realisasiTelat->tanggal_realisasi));
+                } elseif ($totalRealisasi < $t->target) {
+                    if (Carbon::now()->gt(Carbon::parse($t->deadline))) {
+                        $hariTelat = Carbon::parse($t->deadline)->diffInDays(Carbon::now());
+                    }
+                }
+
+                // Penalti 5% per hari keterlambatan dikalikan bobot
+                $penalti = $bobot * 0.05 * $hariTelat;
+            }
 
             // nilai akhir (bobot * progress – penalti)
             $nilaiAkhir = max(0, ($bobot * $progress) - $penalti);
@@ -70,7 +106,7 @@ class PekerjaanController extends Controller
 
             $t->setAttribute(
                 'is_late',
-                Carbon::now()->gt(Carbon::parse($t->deadline)) && $totalRealisasi < $t->target
+                !$selesaiTepat && $hariTelat > 0
             );
 
             // rincian histori realisasi
@@ -114,11 +150,11 @@ class PekerjaanController extends Controller
         ]);
 
         // sisa target
-        $currentTotal = $tugas->semuaRealisasi()->sum('realisasi');
-        $sisa = $tugas->target - $currentTotal;
-        if ($validated['realisasi'] > $sisa) {
-            return back()->withErrors(['realisasi' => "Maksimal realisasi yang bisa dimasukkan hanya $sisa"]);
-        }
+        // $currentTotal = $tugas->semuaRealisasi()->sum('realisasi');
+        // $sisa = $tugas->target - $currentTotal;
+        // if ($validated['realisasi'] > $sisa) {
+        //     return back()->withErrors(['realisasi' => "Maksimal realisasi yang bisa dimasukkan hanya $sisa"]);
+        // }
 
         // upload file bukti
         if ($request->hasFile('file_bukti')) {
@@ -151,11 +187,11 @@ class PekerjaanController extends Controller
         ]);
 
         // sisa target (selain yang sedang diedit)
-        $otherTotal = $tugas->semuaRealisasi()->where('id', '<>', $realisasi->id)->sum('realisasi');
-        $sisa = $tugas->target - $otherTotal;
-        if ($validated['realisasi'] > $sisa) {
-            return back()->withErrors(['realisasi' => "Maksimal realisasi yang bisa dimasukkan hanya $sisa"]);
-        }
+        // $otherTotal = $tugas->semuaRealisasi()->where('id', '<>', $realisasi->id)->sum('realisasi');
+        // $sisa = $tugas->target - $otherTotal;
+        // if ($validated['realisasi'] > $sisa) {
+        //     return back()->withErrors(['realisasi' => "Maksimal realisasi yang bisa dimasukkan hanya $sisa"]);
+        // }
 
         // update file bukti
         if ($request->hasFile('file_bukti')) {
