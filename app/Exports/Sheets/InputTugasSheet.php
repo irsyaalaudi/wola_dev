@@ -18,7 +18,7 @@ class InputTugasSheet implements FromArray, WithHeadings, WithTitle, WithEvents
             'pegawai_id',
             'jenis_pekerjaan_id',
             'target',
-            'deadline'
+            'deadline',
         ];
     }
 

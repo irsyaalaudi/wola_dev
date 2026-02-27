@@ -55,25 +55,19 @@ class PekerjaanController extends Controller
         foreach ($tugas as $t) {
             // total realisasi & progress
             $totalRealisasi = $t->semuaRealisasi->sum('realisasi');
-            $progress = $t->target > 0 ? ($totalRealisasi / $t->target) : 0;
+            $progress = $t->target > 0 ? min($totalRealisasi / $t->target, 1) : 0;
 
             // bobot dari jenis pekerjaan
             $bobot = $t->jenisPekerjaan->bobot ?? 0;
 
-            // keterlambatan
+            // Cek keterlambatan
             $realisasiSortir = $t->semuaRealisasi->sortBy('tanggal_realisasi');
-            $akumulasiCek = 0;
-            $tanggalSelesai = null;
-            foreach ($realisasiSortir as $r) {
-                $akumulasiCek += $r->realisasi;
-                if ($akumulasiCek >= $t->target) {
-                    $tanggalSelesai = $r->tanggal_realisasi;
-                    break;
-                }
-            }
+            $realisasiSebelumDeadline = $realisasiSortir->filter(function ($r) use ($t) {
+                return !Carbon::parse($r->tanggal_realisasi)->gt(Carbon::parse($t->deadline));
+            });
 
-            // Sudah selesai tepat waktu = selesai sebelum atau tepat deadline
-            $selesaiTepat = $tanggalSelesai && !Carbon::parse($tanggalSelesai)->gt(Carbon::parse($t->deadline));
+            $akumulasiCek = $realisasiSebelumDeadline->sum('realisasi');
+            $selesaiTepat = $akumulasiCek >= $t->target;
 
             $hariTelat = 0;
             $penalti = 0;

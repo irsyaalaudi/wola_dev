@@ -3,7 +3,7 @@
 @section('page-title', 'Pekerjaan')
 
 @section('content')
-<div class="bg-white rounded-2xl p-6 mb-12 border border-gray-200 w-full md:w-[1600px]">
+<div class="bg-white rounded-2xl p-6 mb-12 border border-gray-200 w-full md:w-[1610px]">
   <h2 class="text-2xl font-semibold text-blue-600">Data Progres Pekerjaan</h2>
 
   <!-- Progress Bar -->
@@ -40,7 +40,7 @@
 </div>
 
 <!-- Tabel Pekerjaan -->
-<div class="bg-white rounded-xl p-6 border border-gray-200 md:w-[1600px]">
+<div class="bg-white rounded-xl p-6 border border-gray-200 md:w-[1610px]">
   <h2 class="text-2xl font-semibold text-blue-600">Tabel Pekerjaan</h2>
 
   <!-- Filter Form -->
@@ -154,7 +154,7 @@
 </div>
 <!-- Footer Pagination -->
 @if ($tugas->hasPages())
-<div class="flex items-center justify-between border-t border-white/10 px-4 py-3 sm:px-6 md:w-[1600px]">
+<div class="flex items-center justify-between border-t border-white/10 px-4 py-3 sm:px-6 md:w-[1610px]">
   <!-- Mobile Previous/Next -->
   <div class="flex flex-1 justify-between sm:hidden">
     @if ($tugas->onFirstPage())

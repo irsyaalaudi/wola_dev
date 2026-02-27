@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('page-title', 'Dashboard Superadmin')
+@section('page-title', 'Dashboard')
 
 @section('content')
 <div x-data="{ showTable: true, showChart: false }" class="bg-white rounded-2xl p-6 mb-12 border border-gray-200">

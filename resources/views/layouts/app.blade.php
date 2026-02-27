@@ -123,7 +123,7 @@
                 <a href="{{ route('user.pekerjaan.index') }}"
                     class="{{ request()->routeIs('user.pekerjaan.index') ? 'bg-yellow-400 text-blue-900 font-semibold' : 'hover:bg-blue-700' }} flex items-center px-4 py-2 rounded transition">
                     <i class="fas fa-briefcase w-5"></i>
-                    <span class="ml-3">Pekerjaan Tim</span>
+                    <span class="ml-3">Pekerjaan Saya</span>
                 </a>
                 <hr class="my-3 border-blue-600">
                 <a href="{{ route('admin.support') }}"

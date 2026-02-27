@@ -291,12 +291,39 @@ class DashboardController extends Controller
         $progress = $t->target > 0 ? min($totalRealisasi / $t->target, 1) : 0;
         $bobot = $t->jenisPekerjaan->bobot ?? 0;
 
-        $lastDate = $approved->max('tanggal_realisasi');
-        $hariTelat = ($lastDate && $t->deadline && Carbon::parse($lastDate)->gt(Carbon::parse($t->deadline)))
-            ? Carbon::parse($lastDate)->diffInDays(Carbon::parse($t->deadline))
-            : 0;
+        $realisasiSortir = $t->semuaRealisasi->sortBy('tanggal_realisasi');
+        $akumulasiCek = 0;
+        $tanggalSelesai = null;
+        foreach ($realisasiSortir as $r) {
+            $akumulasiCek += $r->realisasi;
+            if ($akumulasiCek >= $t->target) {
+                $tanggalSelesai = $r->tanggal_realisasi;
+                break;
+            }
+        }
 
-        $penalti = $bobot * 0.1 * $hariTelat;
+        $selesaiTepat = $tanggalSelesai && !Carbon::parse($tanggalSelesai)->gt(Carbon::parse($t->deadline));
+
+        $hariTelat = 0;
+        $penalti = 0;
+
+        if (!$selesaiTepat) {
+            $realisasiTelat = $realisasiSortir->first(function ($r) use ($t) {
+                return Carbon::parse($r->tanggal_realisasi)->gt(Carbon::parse($t->deadline));
+            });
+
+            if ($realisasiTelat) {
+                $hariTelat = Carbon::parse($t->deadline)
+                    ->diffInDays(Carbon::parse($realisasiTelat->tanggal_realisasi));
+            } elseif ($totalRealisasi < $t->target) {
+                if (Carbon::now()->gt(Carbon::parse($t->deadline))) {
+                    $hariTelat = Carbon::parse($t->deadline)->diffInDays(Carbon::now());
+                }
+            }
+
+            // Penalti 5% per hari keterlambatan dikalikan bobot
+            $penalti = $bobot * 0.05 * $hariTelat;
+        }
         $nilaiAkhir = max(0, ($bobot * $progress) - $penalti);
 
         $status = match (true) {
