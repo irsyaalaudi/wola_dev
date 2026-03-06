@@ -9,14 +9,14 @@ class User extends Authenticatable
 {
     use Notifiable;
 
-    protected $fillable = ['name', 'email', 'password', 'role', 'pegawai_id'];
+    protected $fillable = ['name', 'email', 'password', 'role'];
 
     /**
      * Relasi ke Pegawai (1 user = 1 pegawai)
      */
     public function pegawai()
     {
-        return $this->belongsTo(Pegawai::class, 'pegawai_id');
+        return $this->hasOne(Pegawai::class, 'user_id');
     }
 
     /**

@@ -43,15 +43,15 @@ class UserController extends Controller
         $search = $request->input('search');
 
         $users = User::with(['pegawai.teams'])
-            ->whereNotNull('pegawai_id')
+            ->whereHas('pegawai')
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
                         ->orWhere('email', 'like', "%{$search}%")
                         ->orWhere('role', 'like', "%{$search}%")
                         ->orWhereHas('pegawai', function ($q2) use ($search) {
-                            $q2->where('nama', 'like', "%{$search}%")
-                                ->orWhere('nip', 'like', "%{$search}%");
+                            $q2->where('nip', 'like', "%{$search}%")
+                               ->orWhere('jabatan', 'like', "%{$search}%");
                         });
                 });
             })
@@ -74,17 +74,21 @@ class UserController extends Controller
             'jabatan'  => 'required',
             'teams'   => 'required|array|min:1',
             'teams.*' => 'exists:teams,id',
-            'leader'   => 'nullable|exists:teams,id', // ✅ cukup satu ID, bukan array
-            'name'     => 'required',
+            'leader'   => 'nullable|exists:teams,id',
             'email'    => 'required|email|unique:users,email',
             'password' => 'required|min:6',
             'role'     => 'required|in:superadmin,admin,user',
         ]);
 
+        $user = User::create([
+            'name'     => $validated['nama'],
+            'email'    => $validated['email'],
+            'password' => Hash::make($validated['password']),
+            'role'     => $validated['role'],
+        ]);
 
-        // Buat pegawai
         $pegawai = Pegawai::create([
-            'nama'    => $validated['nama'],
+            'user_id' => $user->id,
             'nip'     => $validated['nip'],
             'jabatan' => $validated['jabatan'],
         ]);
@@ -101,15 +105,6 @@ class UserController extends Controller
         }
         $pegawai->teams()->sync($syncData);
 
-        // Buat user
-        User::create([
-            'name'       => $validated['name'],
-            'email'      => $validated['email'],
-            'password'   => Hash::make($validated['password']),
-            'role'       => $validated['role'],
-            'pegawai_id' => $pegawai->id,
-        ]);
-
         return back()->with('success', 'User & Pegawai berhasil ditambahkan.');
     }
 
@@ -122,7 +117,7 @@ class UserController extends Controller
 
         $validated = $request->validate([
             'nama'    => 'required',
-            'nip'     => 'required|unique:pegawais,nip,' . $user->pegawai_id,
+            'nip'     => 'required|unique:pegawais,nip,' . $user->pegawai->id, // gunakan pegawai->id, bukan pegawai_id
             'jabatan' => 'required',
             'teams'   => 'required|array|min:1',
             'teams.*' => 'exists:teams,id',
@@ -134,9 +129,7 @@ class UserController extends Controller
             'role'    => 'required|in:superadmin,admin,user',
         ]);
 
-        // Update pegawai
         $user->pegawai->update([
-            'nama'    => $validated['nama'],
             'nip'     => $validated['nip'],
             'jabatan' => $validated['jabatan'],
         ]);
@@ -149,7 +142,7 @@ class UserController extends Controller
                 $existingLeader = Team::find($teamId)
                     ->pegawais()
                     ->wherePivot('is_leader', true)
-                    ->where('pegawai_id', '!=', $user->pegawai_id)
+                    ->where('pegawai_id', '!=', $user->pegawai->id)
                     ->first();
                 if (!$existingLeader) $isLeader = true;
             }
@@ -159,7 +152,7 @@ class UserController extends Controller
 
         // Update user
         $user->update([
-            'name'     => $validated['name'],
+            'name'     => $validated['nama'],
             'email'    => $validated['email'],
             'role'     => $validated['role'],
             'password' => !empty($validated['password']) ? Hash::make($validated['password']) : $user->password,
@@ -193,7 +186,7 @@ class UserController extends Controller
 
 
 
-    // =========================
+// =========================
 // EXPORT
 // =========================
 public function export()
@@ -234,7 +227,7 @@ public function export()
         public function map($user): array
         {
             return [
-                $user->pegawai->nama ?? '-',
+                $user->name,
                 $user->pegawai->nip ?? '-',
                 $user->pegawai->jabatan ?? '-',
                 $user->email,
@@ -336,9 +329,17 @@ public function export()
                         throw new \Exception('Email sudah ada');
                     }
 
-                    // Buat pegawai
+                    // Buat User DULU (karena pegawai butuh user_id)
+                    $user = \App\Models\User::create([
+                        'name'     => $row['nama_pegawai'] ?? 'user',
+                        'email'    => $row['email'],
+                        'password' => \Illuminate\Support\Facades\Hash::make($row['password'] ?? 'password123'),
+                        'role'     => $row['role'] ?? 'user',
+                    ]);
+
+                    // Buat pegawai dengan user_id, nama tidak lagi disimpan di pegawais
                     $pegawai = \App\Models\Pegawai::create([
-                        'nama'    => $row['nama_pegawai'] ?? null,
+                        'user_id' => $user->id,
                         'nip'     => $row['nip'] ?? null,
                         'jabatan' => $row['jabatan'] ?? null,
                     ]);
@@ -409,14 +410,7 @@ public function export()
                     }
                     $pegawai->teams()->sync($syncData);
 
-                    // Buat user
-                    \App\Models\User::create([
-                        'name'       => $row['nama_pegawai'] ?? 'user',
-                        'email'      => $row['email'],
-                        'password'   => \Illuminate\Support\Facades\Hash::make($row['password'] ?? 'password123'),
-                        'role'       => $row['role'] ?? 'user',
-                        'pegawai_id' => $pegawai->id,
-                    ]);
+                    // User sudah dibuat sebelum pegawai di atas
 
                 } catch (\Exception $e) {
                     $this->errors[] = "Baris " . ($index + 2) . " gagal: " . $e->getMessage();

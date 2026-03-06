@@ -6,16 +6,21 @@ use Illuminate\Database\Eloquent\Model;
 
 class Pegawai extends Model
 {
-    protected $fillable = ['nama', 'nip', 'jabatan'];
+    protected $fillable = ['user_id', 'nip', 'jabatan'];
 
     /**
      * Relasi ke User (1 Pegawai = 1 User)
      */
     public function user()
     {
-        return $this->hasOne(User::class);
+        return $this->belongsTo(User::class, 'user_id');
     }
 
+    public function getNamaAttribute()
+    {
+        return $this->user ? $this->user->name : null;
+    }
+    
     /**
      * Relasi ke Team (Many-to-Many)
      * pivot: pegawai_team
