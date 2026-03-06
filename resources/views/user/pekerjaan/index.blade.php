@@ -12,6 +12,16 @@
       placeholder="Cari Jenis Pekerjaan..."
       class="flex-grow min-w-[150px] max-w-xs px-3 py-2 border rounded" />
 
+    {{-- Filter Tim --}}
+    <select name="tim" class="px-3 py-2 border rounded bg-white">
+        <option value="">-- Semua Tim --</option>
+        @foreach($timList as $tim)
+            <option value="{{ $tim->id }}" {{ request('tim') == $tim->id ? 'selected' : '' }}>
+                {{ $tim->nama_tim }}
+            </option>
+        @endforeach
+    </select>
+
     {{-- Filter Bulan --}}
     <div class="flex items-center gap-2">
         <select name="bulan" id="filter_bulan" class="px-3 py-2 border rounded bg-white filter-group-1">
@@ -66,7 +76,20 @@
   <a id="tugas-{{ $t->id }}"></a>
   <div class="border rounded-lg mb-4 overflow-hidden">
     <div class="bg-blue-500 text-white px-4 py-3 flex justify-between items-center">
-      <span class="font-semibold">{{ $t->jenisPekerjaan->nama_pekerjaan ?? '-' }}</span>
+      <div class="flex flex-col gap-1">
+        <span class="font-bold text-white">
+            {{ $t->jenisPekerjaan->nama_pekerjaan ?? '-' }}
+        </span>
+        
+        @if($t->jenisPekerjaan->team)
+            <div class="flex">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[12px] uppercase tracking-wider font-bold bg-white/20 text-yellow-300 border border-white/30 backdrop-blur-sm">
+                    {{ $t->jenisPekerjaan->team->nama_tim }}
+                </span>
+            </div>
+        @endif
+      </div>
+      
       <div class="flex items-center gap-2">
         @php
         $totalRealisasi = $t->total_realisasi ?? $t->semuaRealisasi->sum('realisasi');

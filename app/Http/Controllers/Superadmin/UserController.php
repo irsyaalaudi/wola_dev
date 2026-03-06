@@ -74,7 +74,7 @@ class UserController extends Controller
             'jabatan'  => 'required',
             'teams'   => 'required|array|min:1',
             'teams.*' => 'exists:teams,id',
-            'leader'   => 'nullable|exists:teams,id', // ✅ cukup satu ID, bukan array
+            'leader'   => 'nullable|exists:teams,id', 
             'name'     => 'required',
             'email'    => 'required|email|unique:users,email',
             'password' => 'required|min:6',

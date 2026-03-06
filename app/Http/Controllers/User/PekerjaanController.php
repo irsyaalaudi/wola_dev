@@ -17,7 +17,7 @@ class PekerjaanController extends Controller
     {
         $pegawaiId = auth()->user()->pegawai_id;
 
-        $tugasQuery = Tugas::with(['semuaRealisasi', 'jenisPekerjaan'])
+        $tugasQuery = Tugas::with(['semuaRealisasi', 'jenisPekerjaan.team'])
             ->where('pegawai_id', $pegawaiId);
 
         // Filter nama pekerjaan
@@ -52,7 +52,18 @@ class PekerjaanController extends Controller
             $tugasQuery->where('deadline', '<=', $request->end_date);
         }
 
+        // Filter Tim
+        if ($request->filled('tim')) {
+            $tugasQuery->whereHas('jenisPekerjaan.team', function ($q) use ($request) {
+                $q->where('id', $request->tim);
+            });
+        }
+
         $tugas = $tugasQuery->get();
+
+        $timList = \App\Models\Team::whereHas('pegawais', function ($q) use ($pegawaiId) {
+            $q->where('pegawai_id', $pegawaiId);
+        })->get();
 
         foreach ($tugas as $t) {
             // total realisasi & progress
@@ -125,7 +136,7 @@ class PekerjaanController extends Controller
             $t->setAttribute('rincian', $rincian);
         }
 
-        return view('user.pekerjaan.index', compact('tugas'));
+        return view('user.pekerjaan.index', compact('tugas', 'timList'));
     }
 
     public function storeRealisasi(Request $request, $tugas_id)
