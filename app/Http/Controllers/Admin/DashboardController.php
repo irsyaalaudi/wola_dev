@@ -94,20 +94,35 @@ class DashboardController extends Controller
     $grafikTarget    = $tasks->pluck('totalTarget')->toArray();
     $grafikRealisasi = $tasks->pluck('totalRealisasi')->toArray();
 
-    // =====================
-    // GRAFIK PER PEGAWAI (BARU)
-    // =====================
     $pegawaiSummary = $tasks->groupBy('pegawai_id')->map(function ($items) {
-        return [
-            'nama' => $items->first()->pegawai->nama ?? '-',
-            'target' => $items->sum('totalTarget'),
-            'realisasi' => $items->sum('totalRealisasi'),
-        ];
-    });
+
+    return [
+        'nama' => $items->first()->pegawai->nama ?? '-',
+
+        'target' => $items->sum('totalTarget'),
+
+        'realisasi' => $items->sum('totalRealisasi'),
+
+        // daftar tugas
+        'tugas' => $items->map(function ($task) {
+            return $task->jenisPekerjaan->nama_pekerjaan ?? '-';
+        })->values()->toArray(),
+
+        // tugas + realisasi
+        'realisasi_detail' => $items->map(function ($task) {
+            return [
+                'nama' => $task->jenisPekerjaan->nama_pekerjaan ?? '-',
+                'realisasi' => $task->totalRealisasi ?? 0
+            ];
+        })->values()->toArray()
+    ];
+});
 
     $grafikPegawaiLabels    = $pegawaiSummary->pluck('nama')->values()->toArray();
     $grafikPegawaiTarget    = $pegawaiSummary->pluck('target')->values()->toArray();
     $grafikPegawaiRealisasi = $pegawaiSummary->pluck('realisasi')->values()->toArray();
+    $grafikPegawaiTugas = $pegawaiSummary->pluck('tugas')->values()->toArray();
+    $grafikPegawaiRealisasiDetail = $pegawaiSummary->pluck('realisasi_detail')->values()->toArray();
 
     return view('admin.dashboard', compact(
         'members',
@@ -123,6 +138,8 @@ class DashboardController extends Controller
         'grafikPegawaiLabels',
         'grafikPegawaiTarget',
         'grafikPegawaiRealisasi',
+        'grafikPegawaiTugas',
+        'grafikPegawaiRealisasiDetail',
         'labelBulanTahun'
     ));
 }

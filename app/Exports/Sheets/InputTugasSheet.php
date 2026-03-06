@@ -9,6 +9,7 @@ use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Cell\DataValidation;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
+use PhpOffice\PhpSpreadsheet\Comment;
 
 class InputTugasSheet implements FromArray, WithHeadings, WithTitle, WithEvents
 {
@@ -71,6 +72,11 @@ class InputTugasSheet implements FromArray, WithHeadings, WithTitle, WithEvents
                 $sheet->getStyle('D2:D200')
                     ->getNumberFormat()
                     ->setFormatCode(NumberFormat::FORMAT_DATE_YYYYMMDD2);
+
+                // Comment pada header deadline
+                $sheet->getComment('D1')
+                    ->getText()
+                    ->createTextRun("Format tanggal: \nyyyy-mm-dd\nContoh: 2026-01-01");
 
 
                 // Validasi tanggal

@@ -38,6 +38,7 @@ Route::get('/', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/', [AuthController::class, 'login']);
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
+
 // =========================
 // ADMIN PANEL ROUTES
 // =========================
@@ -124,6 +125,10 @@ Route::prefix('superadmin')->name('superadmin.')->middleware(['auth', 'role:supe
     // Support Route
     Route::get('/support', [SuperadminSupportController::class, 'index'])->name('support');
 });
+
+
+Route::get('/user/pekerjaan/export', [UserPekerjaanController::class, 'export'])
+    ->name('user.pekerjaan.export');
 
 // =========================
 // USER PANEL ROUTES

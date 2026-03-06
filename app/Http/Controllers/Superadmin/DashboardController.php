@@ -132,10 +132,45 @@ $pegawais = Pegawai::with([
             ];
         });
 
+        $tasks = Tugas::with(['pegawai', 'jenisPekerjaan', 'semuaRealisasi']);
+
+if ($bulan) $tasks->whereMonth('created_at', $bulan);
+if ($tahun) $tasks->whereYear('created_at', $tahun);
+
+$tasks = $tasks->get();
+
+        $pegawaiSummary = $pegawais->map(function ($pegawai) {
+
+    $tugas = $pegawai->tugas;
+
+    return [
+        'nama' => $pegawai->nama,
+
+        'tugas' => $tugas->map(function ($task) {
+            return $task->jenisPekerjaan->nama_pekerjaan ?? '-';
+        })->values()->toArray(),
+
+        'realisasi_detail' => $tugas->map(function ($task) {
+
+            $realisasi = $task->semuaRealisasi
+                ->where('is_approved', true)
+                ->sum('realisasi');
+
+            return [
+                'nama' => $task->jenisPekerjaan->nama_pekerjaan ?? '-',
+                'realisasi' => $realisasi
+            ];
+
+        })->values()->toArray()
+    ];
+});
+
         // siapkan data untuk chart
         $chartLabels = $data->pluck('pegawai.nama')->toArray();
         $chartTarget = $data->pluck('grand_target')->toArray();
         $chartRealisasi = $data->pluck('grand_realisasi')->toArray();
+        $chartTugas = $pegawaiSummary->pluck('tugas')->values()->toArray();
+        $chartRealisasiDetail = $pegawaiSummary->pluck('realisasi_detail')->values()->toArray();
 
         return view('superadmin.dashboard', compact(
             'data',
@@ -147,6 +182,8 @@ $pegawais = Pegawai::with([
             'nilaiKeseluruhan',
             'chartLabels',
             'chartTarget',
+            'chartTugas',
+            'chartRealisasiDetail',
             'chartRealisasi'
         ));
     }

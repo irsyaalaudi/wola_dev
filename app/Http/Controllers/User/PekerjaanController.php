@@ -8,6 +8,8 @@ use App\Models\RealisasiTugas;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
+use App\Exports\TugasUserExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class PekerjaanController extends Controller
 {
@@ -204,4 +206,40 @@ class PekerjaanController extends Controller
 
         return back()->with('success', 'Realisasi berhasil diupdate.');
     }
+
+
+public function export(Request $request)
+{
+    $query = Tugas::with(['jenisPekerjaan.team', 'semuaRealisasi'])
+        ->where('pegawai_id', auth()->user()->pegawai_id);
+
+    if ($request->bulan) {
+        $query->whereMonth('created_at', $request->bulan);
+    }
+
+    if ($request->tahun) {
+        $query->whereYear('created_at', $request->tahun);
+    }
+
+    if ($request->start_date) {
+        $query->whereDate('created_at', '>=', $request->start_date);
+    }
+
+    if ($request->end_date) {
+        $query->whereDate('created_at', '<=', $request->end_date);
+    }
+
+    if ($request->jenis_pekerjaan) {
+        $query->whereHas('jenisPekerjaan', function ($q) use ($request) {
+            $q->where('nama_pekerjaan', 'like', '%'.$request->jenis_pekerjaan.'%');
+        });
+    }
+
+    $tugas = $query->get();
+
+    return Excel::download(
+        new TugasUserExport($tugas),
+        'laporan_tugas_user.xlsx'
+    );
+}
 }

@@ -148,6 +148,31 @@
     <div x-show="showChart" x-transition class="bg-white rounded-xl shadow-md border border-gray-200 p-6">
         <h3 class="text-lg font-semibold text-gray-700 mb-4">Total Target vs Realisasi per Pegawai</h3>
         <canvas id="targetRealisasiChart" height="120"></canvas>
+        <div id="modalPegawai"
+            class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+
+            <div class="bg-white rounded-lg shadow-lg w-full max-w-lg p-6">
+
+                <div class="flex justify-between mb-4">
+                    <h3 id="modalPegawaiTitle" class="text-lg font-semibold"></h3>
+                    <button onclick="closeModalPegawai()">✕</button>
+                </div>
+
+                <div id="modalPegawaiContent"
+                    class="max-h-[350px] overflow-y-auto text-sm text-gray-700"></div>
+
+                <div class="mt-4 text-right">
+                    <button onclick="closeModalPegawai()"
+                        class="bg-blue-500 text-white px-4 py-2 rounded">
+                        Tutup
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+</div>
     </div>
 
 </div>
@@ -157,49 +182,118 @@
 
 {{-- Chart.js --}}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <script>
-    const ctx = document.getElementById('targetRealisasiChart').getContext('2d');
 
-    const namaPegawai = @json($chartLabels) || [];
+const ctx = document.getElementById('targetRealisasiChart').getContext('2d');
 
-    // Buat label A, B, C, D...
-    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    const labels = namaPegawai.map((_, index) => {
-        return alphabet[index] ?? `X${index+1}`;
-    });
+const namaPegawai = @json($chartLabels) || [];
+const tugasPegawai = @json($chartTugas) || [];
+const realisasiDetail = @json($chartRealisasiDetail) || [];
 
-    new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [
-                {
-                    label: 'Total Target',
-                    data: @json($chartTarget),
-                    backgroundColor: 'rgba(54, 162, 235, 0.6)'
-                },
-                {
-                    label: 'Total Realisasi',
-                    data: @json($chartRealisasi),
-                    backgroundColor: 'rgba(75, 192, 192, 0.6)'
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: {
-                    position: 'top'
-                }
+const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const labels = namaPegawai.map((_, index) => {
+    return alphabet[index] ?? `X${index+1}`;
+});
+
+new Chart(ctx, {
+    type: 'bar',
+    data: {
+        labels: labels,
+        datasets: [
+            {
+                label: 'Total Target',
+                data: @json($chartTarget),
+                backgroundColor: 'rgba(54, 162, 235, 0.6)'
             },
-            scales: {
-                y: {
-                    beginAtZero: true
-                }
+            {
+                label: 'Total Realisasi',
+                data: @json($chartRealisasi),
+                backgroundColor: 'rgba(75, 192, 192, 0.6)'
             }
-        }
-    });
+        ]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: { position: 'top' }
+        },
+        scales: {
+            y: { beginAtZero: true }
+        },
 
+        onClick: function(evt, elements){
+
+            if(elements.length > 0){
+
+                const index = elements[0].index;
+                const datasetIndex = elements[0].datasetIndex;
+                const nama = namaPegawai[index];
+
+                let html = "";
+
+                // ======================
+                // TARGET
+                // ======================
+                if(datasetIndex === 0){
+
+                    const tugas = tugasPegawai[index] || [];
+
+                    html += `<ul class="list-disc ml-5 space-y-1">`;
+
+                    tugas.forEach(function(t){
+                        html += `<li>${t}</li>`;
+                    });
+
+                    html += `</ul>`;
+
+                    document.getElementById("modalPegawaiTitle").innerText =
+                        "Daftar Tugas: " + nama;
+                }
+
+                // ======================
+                // REALISASI
+                // ======================
+                if(datasetIndex === 1){
+
+                    const detail = realisasiDetail[index] || [];
+
+                    html += `
+                    <div class="max-h-[250px] overflow-y-auto">
+                    <table class="w-full text-sm border">
+                        <thead class="bg-gray-100 sticky top-0">
+                            <tr>
+                                <th class="border px-2 py-1">Tugas</th>
+                                <th class="border px-2 py-1">Realisasi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                    `;
+
+                    detail.forEach(function(d){
+                        html += `
+                        <tr>
+                            <td class="border px-2 py-1">${d.nama}</td>
+                            <td class="border px-2 py-1 text-center">${d.realisasi}</td>
+                        </tr>
+                        `;
+                    });
+
+                    html += `</tbody></table></div>`;
+
+                    document.getElementById("modalPegawaiTitle").innerText =
+                        "Realisasi Tugas: " + nama;
+                }
+
+                document.getElementById("modalPegawaiContent").innerHTML = html;
+
+                document.getElementById("modalPegawai").classList.remove("hidden");
+                document.getElementById("modalPegawai").classList.add("flex");
+            }
+
+        }
+    }
+});
 const container = document.createElement('div');
 
 const total = namaPegawai.length;
@@ -223,5 +317,10 @@ namaPegawai.forEach((nama, index) => {
 });
 
 document.getElementById('targetRealisasiChart').parentNode.appendChild(container);
+
+function closeModalPegawai(){
+    document.getElementById("modalPegawai").classList.add("hidden");
+}
+
 </script>
 @endsection
