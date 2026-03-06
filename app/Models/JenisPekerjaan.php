@@ -10,7 +10,7 @@ class JenisPekerjaan extends Model
         'nama_pekerjaan',
         'satuan',
         'volume',
-        'bobot', // ✅ tambahkan bobot di sini
+        'bobot',
         'pemberi_pekerjaan',
         'tim_id',
     ];
