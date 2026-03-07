@@ -11,7 +11,7 @@ class DashboardController extends Controller
 {
     public function index(Request $request)
     {
-        $pegawaiId = auth()->user()->pegawai_id;
+        $pegawaiId = auth()->user()->pegawai?->id;
 
         // Ambil parameter filter
         $bulan  = $request->input('bulan');  

@@ -13,7 +13,7 @@ class PekerjaanController extends Controller
 {
     public function index(Request $request)
     {
-        $pegawaiId = auth()->user()->pegawai_id;
+        $pegawaiId = auth()->user()->pegawai?->id;
 
         $tugasQuery = Tugas::with(['semuaRealisasi', 'jenisPekerjaan'])
             ->where('pegawai_id', $pegawaiId);
@@ -134,7 +134,7 @@ class PekerjaanController extends Controller
 
     public function storeRealisasi(Request $request, $tugas_id)
     {
-        $pegawaiId = auth()->user()->pegawai_id;
+        $pegawaiId = auth()->user()->pegawai?->id;
 
         $tugas = Tugas::where('id', $tugas_id)
             ->where('pegawai_id', $pegawaiId)
@@ -170,7 +170,7 @@ class PekerjaanController extends Controller
 
     public function updateRealisasi(Request $request, $id)
     {
-        $pegawaiId = auth()->user()->pegawai_id;
+        $pegawaiId = auth()->user()->pegawai?->id;
 
         $realisasi = RealisasiTugas::where('id', $id)
             ->whereHas('tugas', fn($q) => $q->where('pegawai_id', $pegawaiId))

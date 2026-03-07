@@ -19,7 +19,7 @@ class ProgressController extends Controller
     public function index(Request $request)
     {
         $teamIds = DB::table('pegawai_team')
-            ->where('pegawai_id', auth()->user()->pegawai_id)
+            ->where('pegawai_id', auth()->user()->pegawai->id)
             ->where('is_leader', 1)
             ->pluck('team_id')
             ->toArray();
@@ -38,7 +38,7 @@ class ProgressController extends Controller
                 });
 
                 if ($search) {
-                    $q->where('nama', 'like', "%{$search}%");
+                    $q->whereHas('user', fn($u) => $u->where('name', 'like', "%{$search}%"));
                 }
             })
             ->get()
@@ -73,7 +73,7 @@ class ProgressController extends Controller
 
                 return [
                     'id'               => $t->id,
-                    'pegawai'          => $t->pegawai->nama ?? '-',
+                    'pegawai' => $t->pegawai->user->name ?? '-',
                     'tim'              => $namaTim,
                     'nama_tugas'       => $t->jenisPekerjaan->nama_pekerjaan ?? '-',
                     'target'           => $t->target,
@@ -203,7 +203,7 @@ class ProgressController extends Controller
 
                         return [
                             'No'            => $index + 1,
-                            'Nama Pegawai'  => $t->pegawai->nama ?? '-',
+                            'Nama Pegawai' => $t->pegawai->user->name ?? '-',
                             'Nama Tim'      => $namaTim,
                             'Nama Tugas'    => $t->jenisPekerjaan->nama_pekerjaan ?? '-',
                             'Target'        => $t->target,
