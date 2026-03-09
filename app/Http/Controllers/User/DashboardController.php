@@ -14,13 +14,17 @@ class DashboardController extends Controller
         $pegawaiId = auth()->user()->pegawai?->id;
 
         // Ambil parameter filter
-        $bulan  = $request->input('bulan');  
-        $tahun  = $request->input('tahun');  
+        $bulan = $request->input('bulan');
+        $tahun = $request->input('tahun');
         $search = $request->input('search');
 
         // Query dasar
-        $query = Tugas::with(['jenisPekerjaan.team', 'semuaRealisasi'])
-            ->where('pegawai_id', $pegawaiId);
+        $query = Tugas::with(['jenisPekerjaan.teams', 'semuaRealisasi'])
+            ->where('pegawai_id', $pegawaiId)
+            ->where(function ($q) {
+                $q->whereNull('start_date')
+                    ->orWhere('start_date', '<=', now()->toDateString());
+            });
 
         if ($bulan) {
             $query->whereMonth('created_at', $bulan);
@@ -38,10 +42,18 @@ class DashboardController extends Controller
         $tugasSendiri = $query->get();
 
         $namaBulan = [
-            1 => 'Januari', 2 => 'Februari', 3 => 'Maret',
-            4 => 'April', 5 => 'Mei', 6 => 'Juni',
-            7 => 'Juli', 8 => 'Agustus', 9 => 'September',
-            10 => 'Oktober', 11 => 'November', 12 => 'Desember'
+            1 => 'Januari',
+            2 => 'Februari',
+            3 => 'Maret',
+            4 => 'April',
+            5 => 'Mei',
+            6 => 'Juni',
+            7 => 'Juli',
+            8 => 'Agustus',
+            9 => 'September',
+            10 => 'Oktober',
+            11 => 'November',
+            12 => 'Desember'
         ];
 
         $rincian = $tugasSendiri->map(function ($t) use ($namaBulan) {
@@ -50,46 +62,55 @@ class DashboardController extends Controller
             $bobot = $t->jenisPekerjaan->bobot ?? 0;
 
             // Hari telat
-            $lastDate = $t->semuaRealisasi->max('tanggal_realisasi');
+            $realisasiSortir = $t->semuaRealisasi->sortBy('tanggal_realisasi');
+            $akumulasi = 0;
+            $tanggalCapai100 = null;
+            foreach ($realisasiSortir as $r) {
+                $akumulasi += $r->realisasi;
+                if ($akumulasi >= $t->target) {
+                    $tanggalCapai100 = $r->tanggal_realisasi;
+                    break;
+                }
+            }
             $hariTelat = 0;
-            if ($lastDate && Carbon::parse($lastDate)->gt(Carbon::parse($t->deadline))) {
-                $hariTelat = Carbon::parse($lastDate)->diffInDays(Carbon::parse($t->deadline));
+            if ($tanggalCapai100) {
+                if (Carbon::parse($tanggalCapai100)->gt(Carbon::parse($t->deadline))) {
+                    $hariTelat = Carbon::parse($t->deadline)->diffInDays(Carbon::parse($tanggalCapai100));
+                }
+            } else {
+                if (Carbon::now()->gt(Carbon::parse($t->deadline))) {
+                    $hariTelat = Carbon::parse($t->deadline)->diffInDays(Carbon::now());
+                }
             }
 
             // Penalti & nilai akhir
-            $penalti = $bobot * 0.1 * $hariTelat;
+            $penalti = $bobot * 0.5 * $hariTelat;
             $nilaiAkhir = max(0, ($bobot * $progress) - $penalti);
 
             // Status tugas
-            $realisasiTerakhir = $t->semuaRealisasi->last();
-            if (!$realisasiTerakhir) {
-                $status = 'Belum Dikerjakan';
-            } elseif (!$realisasiTerakhir->is_approved) {
-                $status = 'Menunggu Persetujuan';
-            } elseif ($totalRealisasi < $t->target) {
-                $status = 'Ongoing';
-            } else {
-                $status = 'Selesai Dikerjakan';
-            }
+            $status = $t->status ?? 'pending';
 
-            $tanggal = Carbon::parse($t->created_at)->format('d');
-            $bulanNama = $namaBulan[(int)Carbon::parse($t->created_at)->format('m')];
+            $tglRef = $t->start_date ?? $t->created_at;
+            $tanggal = Carbon::parse($tglRef)->format('d');
+            $bulanNama = $namaBulan[(int)Carbon::parse($tglRef)->format('m')];
 
             // Nama tim pemberi tugas
-            $namaTim = $t->jenisPekerjaan->team->nama_tim ?? '-';
+            // $namaTim = $t->jenisPekerjaan->team->nama_tim ?? '-';
 
-            return (object)[
-                'tugas_id'       => $t->id,
+            $namaTim = $t->jenisPekerjaan->teams->first()->nama_tim ?? '-';
+
+            return (object) [
+                'tugas_id' => $t->id,
                 'nama_pekerjaan' => $t->jenisPekerjaan->nama_pekerjaan ?? '-',
-                'nama_tim'       => $namaTim,
-                'tanggal'        => $tanggal,
-                'bulan'          => $bulanNama,
-                'target'         => $t->target,
-                'realisasi'      => $totalRealisasi,
-                'bobot'          => $bobot,
-                'hariTelat'      => $hariTelat,
-                'nilaiAkhir'     => round($nilaiAkhir,2),
-                'status'         => $status,
+                'nama_tim' => $namaTim,
+                'tanggal' => $tanggal,
+                'bulan' => $bulanNama,
+                'target' => $t->target,
+                'realisasi' => $totalRealisasi,
+                'bobot' => $bobot,
+                'hariTelat' => $hariTelat,
+                'nilaiAkhir' => round($nilaiAkhir, 2),
+                'status' => $status,
             ];
         });
 
@@ -97,9 +118,9 @@ class DashboardController extends Controller
         $totalBobot = $tugasSendiri->sum(fn($t) => $t->jenisPekerjaan->bobot ?? 0);
 
         if ($bulan && $tahun) {
-            $labelBulanTahun = strtoupper($namaBulan[(int)$bulan]) . ' ' . $tahun;
+            $labelBulanTahun = strtoupper($namaBulan[(int) $bulan]) . ' ' . $tahun;
         } elseif ($bulan && !$tahun) {
-            $labelBulanTahun = strtoupper($namaBulan[(int)$bulan]) . ' - Semua Tahun';
+            $labelBulanTahun = strtoupper($namaBulan[(int) $bulan]) . ' - Semua Tahun';
         } elseif (!$bulan && $tahun) {
             $labelBulanTahun = 'Semua Bulan - ' . $tahun;
         } else {
@@ -107,9 +128,9 @@ class DashboardController extends Controller
         }
 
         return view('user.dashboard', [
-            'totalTugas'      => $totalTugas,
-            'totalBobot'      => $totalBobot,
-            'rincian'         => $rincian,
+            'totalTugas' => $totalTugas,
+            'totalBobot' => $totalBobot,
+            'rincian' => $rincian,
             'labelBulanTahun' => $labelBulanTahun,
         ]);
     }

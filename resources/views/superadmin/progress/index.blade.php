@@ -65,7 +65,7 @@
           <td class="text-left px-3 py-2">{{ $t->asal ?? '-' }}</td>
           <td class="px-3 py-2">{{ $t->target ?? '-' }}</td>
           <td class="px-3 py-2">{{ optional($t->realisasi)->realisasi ?? '-' }}</td>
-          <td class="px-3 py-2">{{ $t->satuan ?? '-' }}</td>
+          <td class="px-3 py-2">{{ $t->jenisPekerjaan->satuan ?? '-' }}</td>
           <td class="px-3 py-2 text-red-600">
             {{ $t->deadline ? \Carbon\Carbon::parse($t->deadline)->format('d M Y') : '-' }}
           </td>

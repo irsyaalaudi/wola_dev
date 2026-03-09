@@ -53,6 +53,8 @@ return new class extends Migration
 
         Schema::table('pegawais', function (Blueprint $table) {
             $table->dropColumn('nama');
+            $table->dropForeign(['team_id']); 
+            $table->dropColumn('team_id');
         });
 
         Schema::table('users', function (Blueprint $table) {
@@ -82,6 +84,8 @@ return new class extends Migration
         ');
 
         Schema::table('pegawais', function (Blueprint $table) {
+            $table->unsignedBigInteger('team_id')->nullable()->after('jabatan');
+            $table->foreign('team_id')->references('id')->on('teams')->onDelete('set null');
             $table->dropUnique(['user_id']);
             $table->dropForeign(['user_id']);
             $table->dropColumn('user_id');

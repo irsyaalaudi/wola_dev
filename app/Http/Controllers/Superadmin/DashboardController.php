@@ -19,53 +19,58 @@ class DashboardController extends Controller
         $teams = Team::orderBy('nama_tim')->get();
 
         // ambil semua pegawai + relasi yang diperlukan
-$search = trim((string) $request->input('search', ''));
+        $search = trim((string) $request->input('search', ''));
 
-$pegawais = Pegawai::with([
-    'teams',
-    'tugas' => function ($q) use ($bulan, $tahun) {
-        if ($bulan) $q->whereMonth('created_at', $bulan);
-        if ($tahun) $q->whereYear('created_at', $tahun);
-    },
-    'tugas.jenisPekerjaan',
-    'tugas.semuaRealisasi'
-])
-->when($search, function ($q) use ($search) {
-    $names = array_filter(array_map('trim', explode(',', $search)));
-    $q->where(function ($sub) use ($names) {
-        foreach ($names as $name) {
-            $sub->orWhere('nama', 'like', "%$name%");
-        }
-    });
-})
-->when($bulan || $tahun, function ($q) use ($bulan, $tahun) {
-    $q->whereHas('tugas', function ($q2) use ($bulan, $tahun) {
-        if ($bulan) $q2->whereMonth('created_at', $bulan);
-        if ($tahun) $q2->whereYear('created_at', $tahun);
-    });
-})
-->get();
+        $pegawais = Pegawai::with([
+            'user',
+            'teams',
+            'tugas' => function ($q) use ($bulan, $tahun) {
+                if ($bulan)
+                    $q->whereMonth('created_at', $bulan);
+                if ($tahun)
+                    $q->whereYear('created_at', $tahun);
+            },
+            'tugas.jenisPekerjaan',
+            'tugas.semuaRealisasi'
+        ])
+            ->when($search, function ($q) use ($search) {
+                $names = array_filter(array_map('trim', explode(',', $search)));
+                $q->where(function ($sub) use ($names) {
+                    foreach ($names as $name) {
+                        $sub->whereHas('user', fn($u) => $u->where('name', 'like', "%$name%"));
+                    }
+                });
+            })
+            ->when($bulan || $tahun, function ($q) use ($bulan, $tahun) {
+                $q->whereHas('tugas', function ($q2) use ($bulan, $tahun) {
+                    if ($bulan)
+                        $q2->whereMonth('created_at', $bulan);
+                    if ($tahun)
+                        $q2->whereYear('created_at', $tahun);
+                });
+            })
+            ->get();
 
-// kartu ringkasan
+        // kartu ringkasan
         $totalPegawai = Pegawai::count();
 
         $tugasQuery = Tugas::query();
-        if ($bulan) $tugasQuery->whereMonth('created_at', $bulan);
-        if ($tahun) $tugasQuery->whereYear('created_at', $tahun);
+        if ($bulan)
+            $tugasQuery->whereMonth('created_at', $bulan);
+        if ($tahun)
+            $tugasQuery->whereYear('created_at', $tahun);
 
         $totalTugas = (clone $tugasQuery)->count();
 
-        // ongoing = target belum tercapai
         $ongoing = (clone $tugasQuery)
-            ->get()
-            ->filter(fn($t) => $t->semuaRealisasi->sum('realisasi') < $t->target)
-            ->count();
-
-        // selesai = total realisasi >= target
+                    ->where('status', 'on_progress')
+                    ->count();
+        $waitingApproval = (clone $tugasQuery)
+                    ->where('status', 'waiting_approval')
+                    ->count();
         $selesai = (clone $tugasQuery)
-            ->get()
-            ->filter(fn($t) => $t->semuaRealisasi->sum('realisasi') >= $t->target)
-            ->count();
+                    ->where('status', 'done')
+                    ->count();
 
         // nilai keseluruhan (persentase rata-rata)
         $allTugas = (clone $tugasQuery)->with('semuaRealisasi')->get();
@@ -82,11 +87,13 @@ $pegawais = Pegawai::with([
         $data = $pegawais->map(function ($pegawai) use ($teams, $bulan, $tahun) {
             $teamsData = $teams->map(function ($team) use ($pegawai, $bulan, $tahun) {
                 $tugasQuery = $pegawai->tugas()->whereHas('jenisPekerjaan', function ($q) use ($team) {
-                    $q->where('tim_id', $team->id);
+                    $q->whereHas('teams', fn($t) => $t->where('teams.id', $team->id));
                 });
 
-                if ($bulan) $tugasQuery->whereMonth('created_at', $bulan);
-                if ($tahun) $tugasQuery->whereYear('created_at', $tahun);
+                if ($bulan)
+                    $tugasQuery->whereMonth('created_at', $bulan);
+                if ($tahun)
+                    $tugasQuery->whereYear('created_at', $tahun);
 
                 $tugasTim = $tugasQuery->with('semuaRealisasi')->get();
                 $totalTarget = $tugasTim->sum('target');
@@ -96,9 +103,9 @@ $pegawais = Pegawai::with([
                     ->sum('realisasi');
 
                 return [
-                    'team_id'         => $team->id,
-                    'nama_tim'        => $team->nama_tim ?? $team->nama ?? '—',
-                    'total_target'    => $totalTarget,
+                    'team_id' => $team->id,
+                    'nama_tim' => $team->nama_tim ?? $team->nama ?? '—',
+                    'total_target' => $totalTarget,
                     'total_realisasi' => $totalRealisasi,
                 ];
             });
@@ -123,17 +130,17 @@ $pegawais = Pegawai::with([
             }
 
             return [
-                'pegawai'  => $pegawai,
-                'teams'    => $teamsData,
-                'score'    => $score,
-                'grade'    => $grade,
+                'pegawai' => $pegawai,
+                'teams' => $teamsData,
+                'score' => $score,
+                'grade' => $grade,
                 'grand_target' => $grandTarget,
                 'grand_realisasi' => $grandRealisasi,
             ];
         });
 
         // siapkan data untuk chart
-        $chartLabels = $data->pluck('pegawai.nama')->toArray();
+        $chartLabels = $data->map(fn($d) => $d['pegawai']->user->name ?? '-')->toArray();
         $chartTarget = $data->pluck('grand_target')->toArray();
         $chartRealisasi = $data->pluck('grand_realisasi')->toArray();
 
@@ -143,6 +150,7 @@ $pegawais = Pegawai::with([
             'totalPegawai',
             'totalTugas',
             'ongoing',
+            'waitingApproval',
             'selesai',
             'nilaiKeseluruhan',
             'chartLabels',
@@ -158,159 +166,164 @@ $pegawais = Pegawai::with([
 
         $teams = Team::orderBy('nama_tim')->get();
 
-        $pegawais = Pegawai::with(['tugas.jenisPekerjaan', 'tugas.semuaRealisasi'])
-            ->when($search, fn($q) => $q->where('nama', 'like', "%$search%"))
+        $pegawais = Pegawai::with(['user', 'tugas.jenisPekerjaan', 'tugas.semuaRealisasi'])
+            ->when($search, fn($q) => $q->whereHas('user', fn($u) => $u->where('name', 'like', "%$search%")))
             ->get();
 
         // ---- Export dengan multi heading ----
         return \Maatwebsite\Excel\Facades\Excel::download(
-            new class($pegawais, $teams, $bulan, $tahun) implements
-                \Maatwebsite\Excel\Concerns\FromCollection,
-                \Maatwebsite\Excel\Concerns\WithHeadings,
-                \Maatwebsite\Excel\Concerns\WithMapping,
-                \Maatwebsite\Excel\Concerns\WithStyles,
-                \Maatwebsite\Excel\Concerns\WithEvents
+            new class ($pegawais, $teams, $bulan, $tahun) implements
+            \Maatwebsite\Excel\Concerns\FromCollection,
+            \Maatwebsite\Excel\Concerns\WithHeadings,
+            \Maatwebsite\Excel\Concerns\WithMapping,
+            \Maatwebsite\Excel\Concerns\WithStyles,
+            \Maatwebsite\Excel\Concerns\WithEvents {
+            private $pegawais, $teams, $bulan, $tahun;
+
+            public function __construct($pegawais, $teams, $bulan, $tahun)
             {
-                private $pegawais, $teams, $bulan, $tahun;
+                $this->pegawais = $pegawais;
+                $this->teams = $teams;
+                $this->bulan = $bulan;
+                $this->tahun = $tahun;
+            }
 
-                public function __construct($pegawais, $teams, $bulan, $tahun)
-                {
-                    $this->pegawais = $pegawais;
-                    $this->teams = $teams;
-                    $this->bulan = $bulan;
-                    $this->tahun = $tahun;
+            public function collection()
+            {
+                return $this->pegawais;
+            }
+
+            public function headings(): array
+            {
+                // baris header pertama
+                $head1 = ['No', 'Nama Pegawai', 'Jabatan', 'Score (%)', 'Grade'];
+                foreach ($this->teams as $team) {
+                    $head1[] = $team->nama_tim;
+                    $head1[] = '';
                 }
 
-                public function collection()
-                {
-                    return $this->pegawais;
+                // baris header kedua
+                $head2 = ['', '', '', '', ''];
+                foreach ($this->teams as $team) {
+                    $head2[] = 'T';
+                    $head2[] = 'R';
                 }
 
-                public function headings(): array
-                {
-                    // baris header pertama
-                    $head1 = ['No', 'Nama Pegawai', 'Jabatan', 'Score (%)', 'Grade'];
-                    foreach ($this->teams as $team) {
-                        $head1[] = $team->nama_tim;
-                        $head1[] = '';
-                    }
+                return [$head1, $head2];
+            }
 
-                    // baris header kedua
-                    $head2 = ['', '', '', '', ''];
-                    foreach ($this->teams as $team) {
-                        $head2[] = 'T';
-                        $head2[] = 'R';
-                    }
-
-                    return [$head1, $head2];
-                }
-
-                public function map($pegawai): array
-                {
-                    $teamsData = $this->teams->map(function ($team) use ($pegawai) {
-                        $tugasQuery = $pegawai->tugas()->whereHas('jenisPekerjaan', function ($q) use ($team) {
-                            $q->where('tim_id', $team->id);
-                        });
-
-                        if ($this->bulan) $tugasQuery->whereMonth('created_at', $this->bulan);
-                        if ($this->tahun) $tugasQuery->whereYear('created_at', $this->tahun);
-
-                        $tugasTim = $tugasQuery->with('semuaRealisasi')->get();
-                        $totalTarget = $tugasTim->sum('target');
-                        $totalRealisasi = $tugasTim
-                            ->flatMap->semuaRealisasi
-                            ->where('is_approved', true)
-                            ->sum('realisasi');
-
-                        return ['target' => $totalTarget, 'realisasi' => $totalRealisasi];
+            public function map($pegawai): array
+            {
+                $teamsData = $this->teams->map(function ($team) use ($pegawai) {
+                    $tugasQuery = $pegawai->tugas()->whereHas('jenisPekerjaan', function ($q) use ($team) {
+                        $q->whereHas('teams', fn($t) => $t->where('teams.id', $team->id));
                     });
 
-                    $grandTarget = $teamsData->sum('target');
-                    $grandRealisasi = $teamsData->sum('realisasi');
-                    $score = $grandTarget > 0 ? round(($grandRealisasi / $grandTarget) * 100, 2) : 0;
+                    if ($this->bulan)
+                        $tugasQuery->whereMonth('created_at', $this->bulan);
+                    if ($this->tahun)
+                        $tugasQuery->whereYear('created_at', $this->tahun);
 
-                    if ($score >= 90) $grade = 'SANGAT BAIK';
-                    elseif ($score >= 80) $grade = 'BAIK';
-                    elseif ($score >= 70) $grade = 'CUKUP';
-                    elseif ($score >= 60) $grade = 'SEDANG';
-                    else $grade = 'KURANG';
+                    $tugasTim = $tugasQuery->with('semuaRealisasi')->get();
+                    $totalTarget = $tugasTim->sum('target');
+                    $totalRealisasi = $tugasTim
+                        ->flatMap->semuaRealisasi
+                        ->where('is_approved', true)
+                        ->sum('realisasi');
 
-                    $row = [
-                        $pegawai->id,
-                        $pegawai->nama,
-                        $pegawai->jabatan,
-                        $score . '%',
-                        $grade,
-                    ];
+                    return ['target' => $totalTarget, 'realisasi' => $totalRealisasi];
+                });
 
-                    foreach ($teamsData as $teamData) {
-                        $row[] = number_format($teamData['target'], 2);
-                        $row[] = number_format($teamData['realisasi'], 2);
-                    }
+                $grandTarget = $teamsData->sum('target');
+                $grandRealisasi = $teamsData->sum('realisasi');
+                $score = $grandTarget > 0 ? round(($grandRealisasi / $grandTarget) * 100, 2) : 0;
 
-                    return $row;
+                if ($score >= 90)
+                    $grade = 'SANGAT BAIK';
+                elseif ($score >= 80)
+                    $grade = 'BAIK';
+                elseif ($score >= 70)
+                    $grade = 'CUKUP';
+                elseif ($score >= 60)
+                    $grade = 'SEDANG';
+                else
+                    $grade = 'KURANG';
+
+                $row = [
+                    $pegawai->id,
+                    $pegawai->user->name ?? '-',
+                    $pegawai->jabatan,
+                $score . '%',
+                $grade,
+                ];
+
+                foreach ($teamsData as $teamData) {
+                    $row[] = number_format($teamData['target'], 2);
+                    $row[] = number_format($teamData['realisasi'], 2);
                 }
 
-                // ✅ Tambah style
-                public function styles(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet)
-                {
-                    $highestRow    = $sheet->getHighestRow();
-                    $highestColumn = $sheet->getHighestColumn();
+                return $row;
+            }
 
-                    // Style header baris 1 & 2
-                    $sheet->getStyle('A1:' . $highestColumn . '2')->applyFromArray([
-                        'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
-                        'alignment' => ['horizontal' => 'center', 'vertical' => 'center'],
-                        'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN]],
-                        'fill' => [
-                            'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
-                            'color' => ['rgb' => '4F81BD'] // biru tua
-                        ],
-                    ]);
+            public function styles(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet)
+            {
+                $highestRow = $sheet->getHighestRow();
+                $highestColumn = $sheet->getHighestColumn();
 
-                    // Style isi tabel
-                    $sheet->getStyle('A3:' . $highestColumn . $highestRow)->applyFromArray([
-                        'alignment' => ['vertical' => 'center'],
-                        'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN]],
-                    ]);
+                // Style header baris 1 & 2
+                $sheet->getStyle('A1:' . $highestColumn . '2')->applyFromArray([
+                    'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+                    'alignment' => ['horizontal' => 'center', 'vertical' => 'center'],
+                    'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN]],
+                    'fill' => [
+                        'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                        'color' => ['rgb' => '4F81BD'] // biru tua
+                    ],
+                ]);
 
-                    // Kolom No rata tengah
-                    $sheet->getStyle('A3:A' . $highestRow)->getAlignment()->setHorizontal('center');
+                // Style isi tabel
+                $sheet->getStyle('A3:' . $highestColumn . $highestRow)->applyFromArray([
+                    'alignment' => ['vertical' => 'center'],
+                    'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN]],
+                ]);
 
-                    // Kolom Score (%) & Grade rata tengah
-                    $sheet->getStyle('D3:E' . $highestRow)->getAlignment()->setHorizontal('center');
+                // Kolom No rata tengah
+                $sheet->getStyle('A3:A' . $highestRow)->getAlignment()->setHorizontal('center');
 
-                    // Tinggi header
-                    $sheet->getRowDimension(1)->setRowHeight(25);
-                    $sheet->getRowDimension(2)->setRowHeight(20);
+                // Kolom Score (%) & Grade rata tengah
+                $sheet->getStyle('D3:E' . $highestRow)->getAlignment()->setHorizontal('center');
 
-                    return [];
-                }
+                // Tinggi header
+                $sheet->getRowDimension(1)->setRowHeight(25);
+                $sheet->getRowDimension(2)->setRowHeight(20);
 
-                public function registerEvents(): array
-                {
-                    return [
-                        \Maatwebsite\Excel\Events\AfterSheet::class => function (\Maatwebsite\Excel\Events\AfterSheet $event) {
-                            $sheet = $event->sheet->getDelegate();
+                return [];
+            }
 
-                            // Merge header nama tim
-                            $colIndex = 6; // mulai kolom tim
-                            foreach ($this->teams as $team) {
-                                $colLetterStart = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($colIndex);
-                                $colLetterEnd   = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($colIndex + 1);
+            public function registerEvents(): array
+            {
+                return [
+                    \Maatwebsite\Excel\Events\AfterSheet::class => function (\Maatwebsite\Excel\Events\AfterSheet $event) {
+                        $sheet = $event->sheet->getDelegate();
 
-                                $sheet->mergeCells("{$colLetterStart}1:{$colLetterEnd}1");
-                                $colIndex += 2;
-                            }
+                        // Merge header nama tim
+                        $colIndex = 6; // mulai kolom tim
+                        foreach ($this->teams as $team) {
+                            $colLetterStart = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($colIndex);
+                            $colLetterEnd = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($colIndex + 1);
 
-                            // Autosize semua kolom
-                            $highestColumn = $sheet->getHighestColumn();
-                            foreach (range('A', $highestColumn) as $col) {
-                                $sheet->getColumnDimension($col)->setAutoSize(true);
-                            }
-                        },
-                    ];
-                }
+                            $sheet->mergeCells("{$colLetterStart}1:{$colLetterEnd}1");
+                            $colIndex += 2;
+                        }
+
+                        // Autosize semua kolom
+                        $highestColumn = $sheet->getHighestColumn();
+                        foreach (range('A', $highestColumn) as $col) {
+                            $sheet->getColumnDimension($col)->setAutoSize(true);
+                        }
+                    },
+                ];
+            }
             },
             'laporan_dashboard_superadmin.xlsx'
         );

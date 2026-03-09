@@ -13,10 +13,14 @@ class PekerjaanController extends Controller
 {
     public function index(Request $request)
     {
-        $pegawaiId = auth()->user()->pegawai?->id;
+        $pegawaiId = auth()->user()->pegawai->id;
 
         $tugasQuery = Tugas::with(['semuaRealisasi', 'jenisPekerjaan'])
-            ->where('pegawai_id', $pegawaiId);
+            ->where('pegawai_id', $pegawaiId)
+            ->where(function ($q) {
+                $q->whereNull('start_date')
+                ->orWhere('start_date', '<=', now()->toDateString());
+            });
 
         // Filter nama pekerjaan
         if ($request->filled('search')) {
@@ -28,6 +32,12 @@ class PekerjaanController extends Controller
         if ($request->filled('jenis_pekerjaan')) {
             $tugasQuery->whereHas('jenisPekerjaan', function ($q) use ($request) {
                 $q->where('nama_pekerjaan', 'like', '%' . $request->jenis_pekerjaan . '%');
+            });
+        }
+
+        if ($request->filled('tim')) {
+            $tugasQuery->whereHas('jenisPekerjaan.teams', function ($q) use ($request) {
+                $q->where('id', $request->tim);
             });
         }
 
@@ -52,6 +62,10 @@ class PekerjaanController extends Controller
 
         $tugas = $tugasQuery->get();
 
+        $timList = \App\Models\Team::whereHas('pegawais', function ($q) use ($pegawaiId) {
+            $q->where('pegawai_id', $pegawaiId);
+        })->get();
+
         foreach ($tugas as $t) {
             // total realisasi & progress
             $totalRealisasi = $t->semuaRealisasi->sum('realisasi');
@@ -62,39 +76,35 @@ class PekerjaanController extends Controller
 
             // keterlambatan
             $realisasiSortir = $t->semuaRealisasi->sortBy('tanggal_realisasi');
-            $akumulasiCek = 0;
-            $tanggalSelesai = null;
+
+            // Cari tanggal saat realisasi pertama kali mencapai 100%
+            $akumulasi = 0;
+            $tanggalCapai100 = null;
             foreach ($realisasiSortir as $r) {
-                $akumulasiCek += $r->realisasi;
-                if ($akumulasiCek >= $t->target) {
-                    $tanggalSelesai = $r->tanggal_realisasi;
-                    break;
+                $akumulasi += $r->realisasi;
+                if ($akumulasi >= $t->target) {
+                    $tanggalCapai100 = $r->tanggal_realisasi;
+                    break; // berhenti di sini, input setelah 100% diabaikan
                 }
             }
-
-            // Sudah selesai tepat waktu = selesai sebelum atau tepat deadline
-            $selesaiTepat = $tanggalSelesai && !Carbon::parse($tanggalSelesai)->gt(Carbon::parse($t->deadline));
 
             $hariTelat = 0;
             $penalti = 0;
 
-            if (!$selesaiTepat) {
-                $realisasiTelat = $realisasiSortir->first(function ($r) use ($t) {
-                    return Carbon::parse($r->tanggal_realisasi)->gt(Carbon::parse($t->deadline));
-                });
-
-                if ($realisasiTelat) {
+            if ($tanggalCapai100) {
+                // sudah 100%, cek apakah terlambat
+                if (Carbon::parse($tanggalCapai100)->gt(Carbon::parse($t->deadline))) {
                     $hariTelat = Carbon::parse($t->deadline)
-                        ->diffInDays(Carbon::parse($realisasiTelat->tanggal_realisasi));
-                } elseif ($totalRealisasi < $t->target) {
-                    if (Carbon::now()->gt(Carbon::parse($t->deadline))) {
-                        $hariTelat = Carbon::parse($t->deadline)->diffInDays(Carbon::now());
-                    }
+                        ->diffInDays(Carbon::parse($tanggalCapai100));
                 }
-
-                // Penalti 5% per hari keterlambatan dikalikan bobot
-                $penalti = $bobot * 0.05 * $hariTelat;
+            } else {
+                // belum 100%, cek apakah sudah lewat deadline
+                if (Carbon::now()->gt(Carbon::parse($t->deadline))) {
+                    $hariTelat = Carbon::parse($t->deadline)->diffInDays(Carbon::now());
+                }
             }
+
+            $penalti = $bobot * 0.05 * $hariTelat;
 
             // nilai akhir (bobot * progress – penalti)
             $nilaiAkhir = max(0, ($bobot * $progress) - $penalti);
@@ -106,7 +116,7 @@ class PekerjaanController extends Controller
 
             $t->setAttribute(
                 'is_late',
-                !$selesaiTepat && $hariTelat > 0
+                $hariTelat > 0
             );
 
             // rincian histori realisasi
@@ -129,18 +139,18 @@ class PekerjaanController extends Controller
             $t->setAttribute('rincian', $rincian);
         }
 
-        return view('user.pekerjaan.index', compact('tugas'));
+        return view('user.pekerjaan.index', compact('tugas', 'timList'));
     }
 
     public function storeRealisasi(Request $request, $tugas_id)
     {
-        $pegawaiId = auth()->user()->pegawai?->id;
+        $pegawaiId = auth()->user()->pegawai->id;
 
         $tugas = Tugas::where('id', $tugas_id)
             ->where('pegawai_id', $pegawaiId)
             ->firstOrFail();
 
-        $tanggalAwal = $tugas->created_at->toDateString();
+        $tanggalAwal = $tugas->start_date ?? $tugas->created_at->toDateString();
 
         $validated = $request->validate([
             'realisasi' => 'required|numeric|min:1',
@@ -148,13 +158,6 @@ class PekerjaanController extends Controller
             'catatan' => 'nullable|string',
             'file_bukti' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:2048',
         ]);
-
-        // sisa target
-        // $currentTotal = $tugas->semuaRealisasi()->sum('realisasi');
-        // $sisa = $tugas->target - $currentTotal;
-        // if ($validated['realisasi'] > $sisa) {
-        //     return back()->withErrors(['realisasi' => "Maksimal realisasi yang bisa dimasukkan hanya $sisa"]);
-        // }
 
         // upload file bukti
         if ($request->hasFile('file_bukti')) {
@@ -164,20 +167,24 @@ class PekerjaanController extends Controller
         $validated['tugas_id'] = $tugas->id;
 
         RealisasiTugas::create($validated);
+        $totalRealisasi = $tugas->semuaRealisasi()->sum('realisasi');
+        $tugas->update([
+            'status' => $totalRealisasi >= $tugas->target ? 'waiting_approval' : 'on_progress'
+        ]);
 
         return back()->with('success', 'Realisasi berhasil disimpan.');
     }
 
     public function updateRealisasi(Request $request, $id)
     {
-        $pegawaiId = auth()->user()->pegawai?->id;
+        $pegawaiId = auth()->user()->pegawai->id;
 
         $realisasi = RealisasiTugas::where('id', $id)
             ->whereHas('tugas', fn($q) => $q->where('pegawai_id', $pegawaiId))
             ->firstOrFail();
 
         $tugas = $realisasi->tugas;
-        $tanggalAwal = $tugas->created_at->toDateString();
+        $tanggalAwal = $tugas->start_date ?? $tugas->created_at->toDateString();
 
         $validated = $request->validate([
             'realisasi' => 'required|numeric|min:1',
@@ -185,13 +192,6 @@ class PekerjaanController extends Controller
             'catatan' => 'nullable|string',
             'file_bukti' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:2048',
         ]);
-
-        // sisa target (selain yang sedang diedit)
-        // $otherTotal = $tugas->semuaRealisasi()->where('id', '<>', $realisasi->id)->sum('realisasi');
-        // $sisa = $tugas->target - $otherTotal;
-        // if ($validated['realisasi'] > $sisa) {
-        //     return back()->withErrors(['realisasi' => "Maksimal realisasi yang bisa dimasukkan hanya $sisa"]);
-        // }
 
         // update file bukti
         if ($request->hasFile('file_bukti')) {
@@ -204,6 +204,10 @@ class PekerjaanController extends Controller
         }
 
         $realisasi->update($validated);
+        $totalRealisasi = $tugas->semuaRealisasi()->sum('realisasi'); 
+        $tugas->update([
+            'status' => $totalRealisasi >= $tugas->target ? 'waiting_approval' : 'on_progress'
+        ]);
 
         return back()->with('success', 'Realisasi berhasil diupdate.');
     }

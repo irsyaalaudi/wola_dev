@@ -53,9 +53,9 @@ class DashboardController extends Controller
         $memberIds = $members->pluck('id')->toArray();
 
         // Query tugas
-        $tasksQuery = Tugas::with(['pegawai.teams', 'jenisPekerjaan.team', 'semuaRealisasi'])
+        $tasksQuery = Tugas::with(['pegawai.teams', 'jenisPekerjaan.teams', 'semuaRealisasi'])
             ->whereIn('pegawai_id', $memberIds)
-            ->where('asal', $userPegawai->nama)
+            ->where('asal', auth()->user()->name)
             ->when($bulan, fn($q) => $q->whereMonth('created_at', $bulan))
             ->when($tahun, fn($q) => $q->whereYear('created_at', $tahun));
 
@@ -64,7 +64,7 @@ class DashboardController extends Controller
             $keywords = preg_split('/[\s,]+/', $search, -1, PREG_SPLIT_NO_EMPTY);
             $tasksQuery->where(function ($q) use ($keywords) {
                 foreach ($keywords as $word) {
-                    $q->orWhereHas('pegawai', fn($qq) => $qq->where('nama', 'like', "%$word%"))
+                    $q->orWhereHas('pegawai.user', fn($qq) => $qq->where('name', 'like', "%$word%"))
                         ->orWhereHas('jenisPekerjaan', fn($qq) => $qq->where('nama_pekerjaan', 'like', "%$word%"));
                 }
             });
@@ -76,9 +76,10 @@ class DashboardController extends Controller
         $tasks->transform(fn($t) => $this->calculateTask($t));
 
         $totalTugas      = $tasks->count();
-        $tugasSelesai    = $tasks->where('status', 'Selesai Dikerjakan')->count();
-        $tugasOngoing    = $tasks->where('status', 'Ongoing')->count();
-        $tugasBelum      = $tasks->where('status', 'Belum Dikerjakan')->count();
+        $tugasSelesai       = $tasks->where('status', 'done')->count();
+        $tugasOngoing       = $tasks->where('status', 'on_progress')->count();
+        $tugasBelum         = $tasks->where('status', 'pending')->count();
+        $tugasWaitingApproval = $tasks->where('status', 'waiting_approval')->count();
         $rataNilaiAkhir  = $totalTugas > 0 ? round($tasks->avg('nilaiAkhir'), 2) : 0;
 
         $grafikLabels    = $tasks->pluck('jenisPekerjaan.nama_pekerjaan')->toArray();
@@ -92,6 +93,7 @@ class DashboardController extends Controller
             'tugasSelesai',
             'tugasOngoing',
             'tugasBelum',
+            'tugasWaitingApproval',
             'rataNilaiAkhir',
             'grafikLabels',
             'grafikTarget',
@@ -115,9 +117,9 @@ class DashboardController extends Controller
         $memberIds = Pegawai::whereHas('teams', fn($q) => $q->whereIn('teams.id', $teamIds))
             ->pluck('id')->toArray();
 
-        $tasks = Tugas::with(['pegawai.teams', 'jenisPekerjaan.team', 'semuaRealisasi'])
+        $tasks = Tugas::with(['pegawai.teams', 'jenisPekerjaan.teams', 'semuaRealisasi'])
             ->whereIn('pegawai_id', $memberIds)
-            ->where('asal', $userPegawai->nama);
+            ->where('asal', auth()->user()->name);
 
         if ($bulan) $tasks->whereMonth('created_at', $bulan);
         if ($tahun) $tasks->whereYear('created_at', $tahun);
@@ -126,7 +128,7 @@ class DashboardController extends Controller
             $keywords = preg_split('/[\s,]+/', $search, -1, PREG_SPLIT_NO_EMPTY);
             $tasks->where(function ($q) use ($keywords) {
                 foreach ($keywords as $word) {
-                    $q->orWhereHas('pegawai', fn($qq) => $qq->where('nama', 'like', "%$word%"))
+                    $q->orWhereHas('pegawai.user', fn($qq) => $qq->where('name', 'like', "%$word%"))
                         ->orWhereHas('jenisPekerjaan', fn($qq) => $qq->where('nama_pekerjaan', 'like', "%$word%"));
                 }
             });
@@ -139,7 +141,7 @@ class DashboardController extends Controller
         $rows = $tasks->map(function ($t, $i) {
             return [
                 'No'                => $i + 1,
-                'Nama Pegawai'      => $t->pegawai->nama ?? '-',
+                'Nama Pegawai' => $t->pegawai->user->name ?? '-',
                 'Nama Tim'          => $t->namaTim,
                 'Tugas'             => $t->jenisPekerjaan->nama_pekerjaan ?? '-',
                 'Target'            => $t->target,
@@ -272,17 +274,10 @@ class DashboardController extends Controller
         $penalti = $bobot * 0.1 * $hariTelat;
         $nilaiAkhir = max(0, ($bobot * $progress) - $penalti);
 
-        $status = match (true) {
-            $approved->isEmpty() => ($t->semuaRealisasi->isNotEmpty() ? 'Menunggu Persetujuan' : 'Belum Dikerjakan'),
-            $totalRealisasi < $t->target => 'Ongoing',
-            default => 'Selesai Dikerjakan'
-        };
-
         $t->namaTim        = $t->jenisPekerjaan->team->nama_tim ?? '-';
         $t->bobot          = $bobot;
         $t->hariTelat      = $hariTelat;
         $t->nilaiAkhir     = round($nilaiAkhir, 2);
-        $t->status         = $status;
         $t->totalTarget    = $t->target ?? 0;
         $t->totalRealisasi = $totalRealisasi ?? 0;
 
