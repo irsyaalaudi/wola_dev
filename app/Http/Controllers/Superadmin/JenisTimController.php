@@ -22,7 +22,7 @@ class JenisTimController extends Controller
         $search = $request->input('search');
 
         // Load relasi pegawais
-        $query = Team::with('pegawais');
+        $query = Team::with('pegawais.user');
 
         if ($search) {
             $query->where('nama_tim', 'like', "%{$search}%");
@@ -65,7 +65,9 @@ class JenisTimController extends Controller
 
                 return $data->values()->map(function ($team, $index) {
                     // Ambil ketua tim jika ada
-                    $ketua = $team->pegawais?->where('pivot.is_leader', 1)->pluck('nama')->join(', ') ?: '-';
+                    $ketua = $team->pegawais?->where('pivot.is_leader', 1)
+                            ->map(fn($p) => $p->user->name ?? '-')
+                            ->join(', ') ?: '-';
 
                     return [
                         'No'       => $index + 1,

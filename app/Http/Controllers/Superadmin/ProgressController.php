@@ -14,25 +14,24 @@ class ProgressController extends Controller
 {
     public function index()
     {
-        // 🔹 Hitung nilai akhir tiap pegawai berdasarkan realisasi APPROVED saja
-        $pegawais = Pegawai::with(['tugas.realisasi', 'tugas.jenisPekerjaan'])->get();
+        $pegawais = Pegawai::with(['user', 'tugas.semuaRealisasi', 'tugas.jenisPekerjaan'])->get();
 
         foreach ($pegawais as $pegawai) {
             $totalNilai  = 0;
             $jumlahTugas = 0;
 
             foreach ($pegawai->tugas as $tugas) {
-                if ($tugas->realisasi && $tugas->realisasi->is_approved) {
-                    // hitung nilai akhir tiap tugas
+                if ($tugas->status === 'done') {
+                    $approved = $tugas->semuaRealisasi->where('is_approved', true);
+                    $realisasi = $approved->sum('realisasi');
+                    $tglReal   = $approved->max('tanggal_realisasi');
                     $target    = $tugas->target ?? 0;
-                    $realisasi = $tugas->realisasi->realisasi ?? 0;
                     $progress  = $target > 0 ? min($realisasi / $target, 1) : 0;
 
                     $bobot     = $tugas->jenisPekerjaan->bobot ?? 0;
 
                     // penalti (opsional)
                     $deadline  = $tugas->deadline;
-                    $tglReal   = $tugas->realisasi->tanggal_realisasi;
                     $hariTelat = 0;
                     if ($deadline && $tglReal && strtotime($tglReal) > strtotime($deadline)) {
                         $hariTelat = (new \Carbon\Carbon($deadline))->diffInDays(new \Carbon\Carbon($tglReal));
@@ -55,20 +54,18 @@ class ProgressController extends Controller
         }
 
         // 🔹 Hanya tampilkan tugas yang sudah di-approve
-        $tugas = Tugas::with(['pegawai', 'realisasi', 'jenisPekerjaan.team'])
-            ->whereHas('realisasi', function ($q) {
-                $q->where('is_approved', true);
-            })
+        $tugas = Tugas::with(['pegawai', 'semuaRealisasi', 'jenisPekerjaan.teams'])
+            ->where('status', 'done')
             ->when(request('search_tugas'), function ($query, $search) {
                 $query->whereHas('jenisPekerjaan', function ($q) use ($search) {
                     $q->where('nama_pekerjaan', 'like', "%{$search}%");
                 })
                     ->orWhereHas('pegawai', function ($q) use ($search) {
-                        $q->where('nama', 'like', "%{$search}%")
+                        $q->whereHas('user', fn($u) => $u->where('name', 'like', "%{$search}%"))
                             ->orWhere('nip', 'like', "%{$search}%");
                     })
-                    ->orWhereHas('jenisPekerjaan.team', function ($q) use ($search) {
-                        $q->where('nama', 'like', "%{$search}%");
+                    ->orWhereHas('jenisPekerjaan.teams', function ($q) use ($search) {
+                        $q->where('nama_tim', 'like', "%{$search}%");
                     });
             })
             ->paginate(3, ['*'], 'tugas_page');
@@ -77,7 +74,7 @@ class ProgressController extends Controller
         $progress = Progress::with('pegawai')
             ->when(request('search_progress'), function ($query, $search) {
                 $query->whereHas('pegawai', function ($q) use ($search) {
-                    $q->where('nama', 'like', "%{$search}%")
+                    $q->whereHas('user', fn($u) => $u->where('name', 'like', "%{$search}%"))
                         ->orWhere('nip', 'like', "%{$search}%");
                 });
             })
@@ -89,13 +86,11 @@ class ProgressController extends Controller
     public function show($id)
     {
         $pegawai = Pegawai::with([
-            'tugas.realisasi' => function ($q) {
-                $q->where('is_approved', true);
-            },
-            'tugas.jenisPekerjaan.team',
+            'user',
+            'tugas.semuaRealisasi' => fn($q) => $q->where('is_approved', true),
+            'tugas.jenisPekerjaan.teams',
             'progress'
-        ])
-            ->findOrFail($id);
+        ])->findOrFail($id);
 
         return view('superadmin.progress.detail', compact('pegawai'));
     }
@@ -105,18 +100,19 @@ class ProgressController extends Controller
         return Excel::download(new class implements FromCollection, WithHeadings, \Maatwebsite\Excel\Concerns\WithStyles {
             public function collection()
             {
-                $tugas = Tugas::with(['pegawai', 'realisasi', 'jenisPekerjaan.team'])->get();
+                $tugas = Tugas::with(['pegawai.user', 'semuaRealisasi', 'jenisPekerjaan.teams'])->get();
 
                 return $tugas->map(function ($tugas, $index) {
                     // hitung nilai akhir per tugas
                     $target    = $tugas->target ?? 0;
-                    $realisasi = ($tugas->realisasi && $tugas->realisasi->is_approved)
-                        ? $tugas->realisasi->realisasi : 0;
+                    $approved = $tugas->semuaRealisasi->where('is_approved', true);
+                    $realisasi = $approved->sum('realisasi');
+                    $tglReal = $approved->max('tanggal_realisasi');
                     $progress  = $target > 0 ? min($realisasi / $target, 1) : 0;
                     $bobot     = $tugas->jenisPekerjaan->bobot ?? 0;
 
                     $deadline  = $tugas->deadline;
-                    $tglReal   = $tugas->realisasi->tanggal_realisasi ?? null;
+                    $tglReal = $approved->max('tanggal_realisasi');
                     $hariTelat = 0;
                     if ($deadline && $tglReal && strtotime($tglReal) > strtotime($deadline)) {
                         $hariTelat = (new \Carbon\Carbon($deadline))->diffInDays(new \Carbon\Carbon($tglReal));
@@ -127,21 +123,20 @@ class ProgressController extends Controller
 
                     return [
                         'No'                => $index + 1,
-                        'Nama Pegawai'      => $tugas->pegawai->nama ?? '-',
+                        'Nama Pegawai'      => $tugas->pegawai->user->name ?? '-',
                         'Nama Pekerjaan'    => $tugas->jenisPekerjaan->nama_pekerjaan ?? '-',
-                        'Nama Tim'          => $tugas->jenisPekerjaan->team->nama ?? '-',
+                        'Nama Tim'          => $tugas->jenisPekerjaan->team->nama_tim ?? '-',
                         'Asal'              => $tugas->asal ?? '-',
                         'Target'            => $tugas->target ?? 0,
                         'Realisasi'         => $realisasi,
-                        'Satuan'            => $tugas->satuan ?? '-',
+                        'Satuan'            => $tugas->jenisPekerjaan->satuan ?? '-',
                         'Deadline'          => $tugas->deadline
                             ? date('d-m-Y', strtotime($tugas->deadline)) : '-',
-                        'Tanggal Realisasi' => ($tugas->realisasi && $tugas->realisasi->is_approved && $tugas->realisasi->tanggal_realisasi)
-                            ? date('d-m-Y', strtotime($tugas->realisasi->tanggal_realisasi)) : '-',
+                        'Tanggal Realisasi' => $tglReal ? date('d-m-Y', strtotime($tglReal)) : '-',
                         'Bobot'             => $bobot,
                         'Nilai Akhir'       => round($nilaiAkhirTugas, 2),
-                        'Catatan'           => $tugas->realisasi->catatan ?? '-',
-                        'Bukti'             => $tugas->realisasi->file_bukti ?? '-',
+                        'Catatan' => $approved->last()?->catatan ?? '-',
+                        'Bukti'   => $approved->last()?->file_bukti ?? '-',
                     ];
                 });
             }
@@ -209,12 +204,12 @@ class ProgressController extends Controller
         return Excel::download(new class implements FromCollection, WithHeadings, \Maatwebsite\Excel\Concerns\WithStyles {
             public function collection()
             {
-                $progress = Progress::with('pegawai')->get();
+                $progress = Progress::with('pegawai.user')->get();
 
                 return $progress->map(function ($item, $index) {
                     return [
                         'No.'          => $index + 1,
-                        'Nama Pegawai' => $item->pegawai->nama ?? '-',
+                        'Nama Pegawai' => $item->pegawai->user->name ?? '-',
                         'NIP'          => $item->pegawai->nip ?? '-',
                         'Nilai Akhir'  => $item->nilai_akhir,
                     ];

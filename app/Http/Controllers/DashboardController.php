@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Pekerjaan;
 use App\Models\Progress;
 use App\Models\NilaiAkhirUser;
-use App\Models\User; // Pastikan User model diimport
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller

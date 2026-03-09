@@ -83,6 +83,7 @@
                     <th class="px-3 py-2 border">Bobot</th>
                     <th class="px-3 py-2 border">Hari Telat</th>
                     <th class="px-3 py-2 border">Nilai Akhir</th>
+                    <th class="px-3 py-2 border">Status</th>
                 </tr>
             </thead>
             <tbody>
@@ -98,10 +99,24 @@
                     <td class="px-3 py-2 border">{{ $t->bobot }}</td>
                     <td class="px-3 py-2 border">{{ $t->hariTelat }}</td>
                     <td class="px-3 py-2 border">{{ number_format($t->nilaiAkhir, 2) }}</td>
+                    <td class="px-3 py-2 border">
+                        @php
+                            $statusMap = [
+                                'pending'          => ['label' => 'Belum Dikerjakan', 'class' => 'bg-red-100 text-red-600'],
+                                'on_progress'      => ['label' => 'Sedang Dikerjakan', 'class' => 'bg-yellow-100 text-yellow-700'],
+                                'waiting_approval' => ['label' => 'Menunggu Persetujuan', 'class' => 'bg-blue-100 text-blue-600'],
+                                'done'             => ['label' => 'Selesai', 'class' => 'bg-green-100 text-green-700'],
+                            ];
+                            $s = $statusMap[$t->status] ?? ['label' => $t->status, 'class' => 'bg-gray-100 text-gray-600'];
+                        @endphp
+                        <span class="inline-block px-2 py-1 text-xs font-semibold rounded {{ $s['class'] }}">
+                            {{ $s['label'] }}
+                        </span>
+                    </td>
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="10" class="text-center px-3 py-4 border text-gray-500">Belum ada tugas.</td>
+                    <td colspan="11" class="text-center px-3 py-4 border text-gray-500">Belum ada tugas.</td>
                 </tr>
                 @endforelse
             </tbody>

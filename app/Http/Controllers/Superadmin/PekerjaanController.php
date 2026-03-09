@@ -50,14 +50,15 @@ class PekerjaanController extends Controller
 
         // Ambil semua untuk statistik
         $allTugas = $query->with([
-            'jenisPekerjaan.team',
+            'jenisPekerjaan.teams',
             'semuaRealisasi',
+            'pegawai.user',
             'pegawai.teams'
         ])->get();
 
         // Ambil untuk tabel (realisasi approved saja)
         $tugas = $query->with([
-            'jenisPekerjaan.team',
+            'jenisPekerjaan.teams',
             'semuaRealisasi' => function ($q) {
                 $q->where('is_approved', true);
             },
@@ -88,15 +89,6 @@ class PekerjaanController extends Controller
             // Nilai akhir
             $nilaiAkhir = max(0, ($bobot * $progress) - $penalti);
 
-            // Status
-            if ($approvedRealisasi->isEmpty()) {
-                $status = $t->semuaRealisasi->isNotEmpty() ? 'Menunggu Persetujuan' : 'Belum Dikerjakan';
-            } elseif ($totalRealisasi < $t->target) {
-                $status = 'Ongoing';
-            } else {
-                $status = 'Selesai Dikerjakan';
-            }
-
             // 🔹 Nama tim pemberi tugas (bukan semua tim pegawai)
             $namaTim = $t->jenisPekerjaan->team->nama_tim ?? '-';
 
@@ -104,17 +96,16 @@ class PekerjaanController extends Controller
             $t->bobot       = $bobot;
             $t->hariTelat   = $hariTelat;
             $t->nilaiAkhir  = round($nilaiAkhir, 2);
-            $t->status      = $status;
             $t->namaTim     = $namaTim;
 
             return $t;
         });
 
-        // Hitung statistik jumlah selesai, ongoing, belum
         $totalTugas   = $allTugas->count();
-        $tugasSelesai = $allTugas->filter(fn($t) => $t->semuaRealisasi->where('is_approved', true)->sum('realisasi') >= $t->target)->count();
-        $tugasOngoing = $allTugas->filter(fn($t) => $t->semuaRealisasi->where('is_approved', true)->sum('realisasi') > 0 && $t->semuaRealisasi->where('is_approved', true)->sum('realisasi') < $t->target)->count();
-        $tugasBelum   = $allTugas->filter(fn($t) => $t->semuaRealisasi->where('is_approved', true)->sum('realisasi') == 0)->count();
+        $tugasSelesai        = (clone $query)->where('status', 'done')->count();
+        $tugasOngoing        = (clone $query)->where('status', 'on_progress')->count();
+        $tugasBelum          = (clone $query)->where('status', 'pending')->count();
+        $tugasWaitingApproval = (clone $query)->where('status', 'waiting_approval')->count();
 
         $persentaseSelesai = $totalTugas ? round(($tugasSelesai / $totalTugas) * 100, 2) : 0;
 
@@ -122,6 +113,7 @@ class PekerjaanController extends Controller
             'tugas',
             'totalTugas',
             'tugasSelesai',
+            'tugasWaitingApproval',
             'tugasOngoing',
             'tugasBelum',
             'persentaseSelesai'

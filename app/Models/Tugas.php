@@ -11,9 +11,9 @@ class Tugas extends Model
         'pegawai_id',
         'target',
         'asal',
-        'satuan',
+        'start_date',
         'deadline',
-        'created_at',
+        'status',
     ];
 
     public function jenisPekerjaan()

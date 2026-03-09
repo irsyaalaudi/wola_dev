@@ -78,14 +78,14 @@
           <td class="px-3 py-2 border">{{ $t['nilaiAkhir'] }}</td>
           <td class="px-3 py-2 border">
             @php $status = $t['status']; @endphp
-            @if($status === 'Belum Dikerjakan')
-            <span class="inline-block px-2 py-1 text-xs font-semibold text-white bg-red-500 rounded">{{ $status }}</span>
-            @elseif($status === 'Menunggu Persetujuan')
-            <span class="inline-block px-2 py-1 text-xs font-semibold text-black bg-yellow-300 rounded">{{ $status }}</span>
-            @elseif($status === 'Ongoing')
-            <span class="inline-block px-2 py-1 text-xs font-semibold text-black bg-yellow-300 rounded">{{ $status }}</span>
+            @if($status === 'pending')
+            <span class="inline-block px-2 py-1 text-xs font-semibold text-white bg-red-500 rounded">Belum Dikerjakan</span>
+            @elseif($status === 'waiting_approval')
+            <span class="inline-block px-2 py-1 text-xs font-semibold text-black bg-yellow-300 rounded">Menunggu Persetujuan</span>
+            @elseif($status === 'on_progress')
+            <span class="inline-block px-2 py-1 text-xs font-semibold text-black bg-yellow-300 rounded">Sedang Dikerjakan</span>
             @else
-            <span class="inline-block px-2 py-1 text-xs font-semibold text-white bg-green-600 rounded">{{ $status }}</span>
+            <span class="inline-block px-2 py-1 text-xs font-semibold text-white bg-green-600 rounded">Selesai</span>
             @endif
           </td>
           <td class="px-3 py-2 border">

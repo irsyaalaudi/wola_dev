@@ -167,8 +167,6 @@
             </div>
 
             <!-- Data User -->
-            <input type="text" name="name" class="border rounded-lg px-3 py-2" 
-                   value="{{ $user->name }}" required>
             <input type="email" name="email" class="border rounded-lg px-3 py-2" 
                    value="{{ $user->email }}" required>
             <input type="password" name="password" class="border rounded-lg px-3 py-2" 
@@ -289,7 +287,6 @@
               <p class="text-sm text-red-600 mt-1">{{ $message }}</p>
             @enderror
 
-            <input type="text" name="name" class="border rounded-lg px-3 py-2" placeholder="Nama User" required>
             <input type="email" name="email" class="border rounded-lg px-3 py-2" placeholder="Email" required>
             <input type="password" name="password" class="border rounded-lg px-3 py-2" placeholder="Password" required minlength="6">
             <small class="text-xs text-gray-500">Password minimal 6 karakter</small>

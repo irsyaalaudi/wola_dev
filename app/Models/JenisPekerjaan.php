@@ -9,19 +9,23 @@ class JenisPekerjaan extends Model
     protected $fillable = [
         'nama_pekerjaan',
         'satuan',
-        'volume',
-        'bobot',
-        'pemberi_pekerjaan',
-        'tim_id',
+        'bobot', 
     ];
 
+    public function teams()
+    {
+        return $this->belongsToMany(Team::class, 'jenis_pekerjaan_teams', 'jenis_pekerjaan_id', 'team_id')
+                    ->withTimestamps();
+    }
+
+    public function getTeamAttribute()
+    {
+        return $this->teams->first();
+    }
+    
     public function tugas()
     {
         return $this->hasMany(Tugas::class);
     }
 
-    public function team()
-    {
-        return $this->belongsTo(Team::class, 'tim_id');
-    }
 }
