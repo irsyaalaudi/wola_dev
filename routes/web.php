@@ -38,6 +38,7 @@ Route::get('/', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/', [AuthController::class, 'login']);
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
+
 // =========================
 // ADMIN PANEL ROUTES
 // =========================
@@ -58,6 +59,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     Route::get('progress/export', [AdminProgressController::class, 'export'])->name('progress.export');
     Route::get('/support', [AdminSupportController::class, 'index'])->name('support');
     Route::patch('/progress/{id}/approve', [AdminProgressController::class, 'approve'])->name('progress.approve');
+    Route::get('pekerjaan/template', [AdminPekerjaanController::class, 'downloadTemplate'])
+     ->name('pekerjaan.template');
+
 });
 
 
@@ -121,6 +125,10 @@ Route::prefix('superadmin')->name('superadmin.')->middleware(['auth', 'role:supe
     // Support Route
     Route::get('/support', [SuperadminSupportController::class, 'index'])->name('support');
 });
+
+
+Route::get('/user/pekerjaan/export', [UserPekerjaanController::class, 'export'])
+    ->name('user.pekerjaan.export');
 
 // =========================
 // USER PANEL ROUTES

@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Superadmin;
 use App\Http\Controllers\Controller;
 use App\Models\Tugas;
 use Carbon\Carbon;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\TemplateTugasExport;
 
 class PekerjaanController extends Controller
 {
@@ -117,4 +119,11 @@ class PekerjaanController extends Controller
             'persentaseSelesai'
         ));
     }
+        public function downloadTemplate()
+{
+    return Excel::download(
+        new TemplateTugasExport(auth()->user()),
+        'Template_Tugas.xlsx'
+    );
+}
 }

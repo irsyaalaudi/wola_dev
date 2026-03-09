@@ -141,20 +141,12 @@
 <script>
     const ctx = document.getElementById('grafikUser').getContext('2d');
 
-    const rawLabels = @json($rincian->pluck('nama_pekerjaan')) || [];
+    const namaPekerjaan = @json($rincian->pluck('nama_pekerjaan')) || [];
 
-    function wrapLabel(label, wordsPerLine = 5) {
-        if (!label) return [''];
-        const words = label.split(' ');
-        const lines = [];
-        for (let i = 0; i < words.length; i += wordsPerLine) {
-            lines.push(words.slice(i, i + wordsPerLine).join(' '));
-        }
-        return lines;
-    }
-
-    const labels = rawLabels.map(function(item) {
-        return wrapLabel(item, 5);
+    // Buat label A, B, C, D...
+    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const labels = namaPekerjaan.map((_, index) => {
+        return alphabet[index] ?? `X${index+1}`;
     });
 
     new Chart(ctx, {
@@ -180,11 +172,35 @@
                 legend: { position: 'top' }
             },
             scales: {
-                x: { ticks: { autoSkip: false, maxRotation: 0, minRotation: 0 } },
                 y: { beginAtZero: true }
             }
         }
     });
+
+    // ======= BUAT KETERANGAN DI BAWAH GRAFIK =======
+    const container = document.createElement('div');
+
+const total = namaPekerjaan.length;
+const columns = 3;
+const rows = Math.ceil(total / columns);
+
+container.className = `mt-4 grid grid-flow-col gap-3 text-sm text-gray-700`;
+container.style.gridTemplateRows = `repeat(${rows}, auto)`;
+
+    namaPekerjaan.forEach((nama, index) => {
+        const row = document.createElement('div');
+        row.innerHTML = `
+            <div class="flex items-start gap-2">
+                <span class="w-6 h-6 flex items-center justify-center rounded-full bg-blue-100 text-blue-700 font-semibold text-xs">
+                    ${labels[index]}
+                </span>
+                <span>${nama}</span>
+            </div>
+        `;
+        container.appendChild(row);
+    });
+
+    document.getElementById('grafikUser').parentNode.appendChild(container);
 </script>
 
 @endsection

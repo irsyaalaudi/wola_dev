@@ -118,7 +118,10 @@ class ProgressController extends Controller
 
         $tugas->update(['status' => 'done']);
 
-        return redirect()->back()->with('success', 'Realisasi berhasil disetujui.');
+        return back()
+            ->with('success', 'Berhasil disetujui')
+            ->with('scroll_to', $id);
+
     }
 
     /**

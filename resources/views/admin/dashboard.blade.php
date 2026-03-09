@@ -134,11 +134,50 @@
         </table>
     </div>
 
-    {{-- Grafik Realisasi vs Target --}}
-    <div x-show="showChart" x-transition class="bg-white rounded-xl shadow-md border border-gray-200 p-6 mt-6">
-        <h3 class="text-lg font-semibold text-gray-700 mb-4">Realisasi vs Target ({{ $labelBulanTahun }})</h3>
+    {{-- Semua Grafik --}}
+<div x-show="showChart" x-transition class="mt-6 space-y-6">
+
+    {{-- Grafik 1 --}}
+    <div class="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+        <h3 class="text-lg font-semibold text-gray-700 mb-4">
+            Realisasi vs Target ({{ $labelBulanTahun }})
+        </h3>
         <canvas id="grafikRealisasiTarget" height="120"></canvas>
     </div>
+
+    {{-- Grafik 2 --}}
+    <div class="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+        <h3 class="text-lg font-semibold text-gray-700 mb-4">
+            Realisasi vs Target per Pegawai ({{ $labelBulanTahun }})
+        </h3>
+        <canvas id="grafikPerPegawai" height="120"></canvas>
+        <canvas id="grafikPerPegawai" height="120"></canvas>
+
+<!-- MODAL DETAIL PEGAWAI -->
+<div id="modalPegawai"
+    class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+
+    <div class="bg-white rounded-lg shadow-lg w-full max-w-md p-6">
+
+        <div class="flex justify-between items-center mb-4">
+            <h3 id="modalPegawaiTitle" class="text-lg font-semibold"></h3>
+            <button onclick="closeModalPegawai()" class="text-gray-500 hover:text-black">✕</button>
+        </div>
+
+        <div id="modalPegawaiContent" class="text-sm text-gray-700"></div>
+
+        <div class="mt-4 text-right">
+            <button onclick="closeModalPegawai()"
+                class="bg-blue-500 text-white px-4 py-2 rounded">
+                Tutup
+            </button>
+        </div>
+
+    </div>
+</div>
+    </div>
+
+</div>
 
 </div>
 
@@ -149,36 +188,24 @@
 
 {{-- Script Chart.js --}}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<canvas id="grafikRealisasiTarget"></canvas>
 
 <script>
     const ctx = document.getElementById('grafikRealisasiTarget').getContext('2d');
 
-    // ambil data dari Blade
-    const rawLabels = @json($grafikLabels) || [];
+    const namaTugas = @json($grafikLabels) || [];
 
-    // fungsi untuk memecah label menjadi beberapa baris, tiap 5 kata
-    function wrapLabel(label, wordsPerLine) {
-        wordsPerLine = wordsPerLine || 5;
-        if (!label) return [''];
-        var words = label.split(' ');
-        var lines = [];
-        for (var i = 0; i < words.length; i += wordsPerLine) {
-            lines.push(words.slice(i, i + wordsPerLine).join(' '));
-        }
-        return lines;
-    }
-
-    // proses semua label
-    var labels = rawLabels.map(function(item) {
-        return wrapLabel(item, 5);
+    // Buat label A, B, C, D...
+    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const labels = namaTugas.map((_, index) => {
+        return alphabet[index] ?? `X${index+1}`;
     });
 
     new Chart(ctx, {
         type: 'bar',
         data: {
             labels: labels,
-            datasets: [{
+            datasets: [
+                {
                     label: 'Target',
                     data: @json($grafikTarget),
                     backgroundColor: 'rgba(54, 162, 235, 0.6)'
@@ -200,7 +227,7 @@
             scales: {
                 x: {
                     ticks: {
-                        autoSkip: false, // tampilkan semua label
+                        autoSkip: false,
                         maxRotation: 0,
                         minRotation: 0
                     }
@@ -211,6 +238,195 @@
             }
         }
     });
+
+    // ===== BUAT KETERANGAN DI BAWAH GRAFIK =====
+    // ===== BUAT KETERANGAN DI BAWAH GRAFIK =====
+const container = document.createElement('div');
+
+const total = namaTugas.length;
+const columns = 3;
+const rows = Math.ceil(total / columns);
+
+container.className = `mt-4 grid grid-flow-col gap-3 text-sm text-gray-700`;
+container.style.gridTemplateRows = `repeat(${rows}, auto)`;
+
+    namaTugas.forEach((nama, index) => {
+        const row = document.createElement('div');
+        row.innerHTML = `
+            <div class="flex items-start gap-2">
+                <span class="w-6 h-6 flex items-center justify-center rounded-full bg-blue-100 text-blue-700 font-semibold text-xs">
+                    ${labels[index]}
+                </span>
+                <span>${nama}</span>
+            </div>
+        `;
+        container.appendChild(row);
+    });
+
+    document.getElementById('grafikRealisasiTarget').parentNode.appendChild(container);
 </script>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+
+const ctxPegawai = document.getElementById('grafikPerPegawai').getContext('2d');
+
+const namaPegawai = @json($grafikPegawaiLabels) || [];
+const tugasPegawai = @json($grafikPegawaiTugas) || [];
+const realisasiDetail = @json($grafikPegawaiRealisasiDetail) || [];
+
+// Label A B C
+const alphabetPegawai = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const labelsPegawai = namaPegawai.map((_, index) => {
+    return alphabetPegawai[index] ?? `X${index+1}`;
+});
+
+const chartPegawai = new Chart(ctxPegawai, {
+    type: 'bar',
+    data: {
+        labels: labelsPegawai,
+        datasets: [
+            {
+                label: 'Target',
+                data: @json($grafikPegawaiTarget),
+                backgroundColor: 'rgba(153, 102, 255, 0.6)'
+            },
+            {
+                label: 'Realisasi',
+                data: @json($grafikPegawaiRealisasi),
+                backgroundColor: 'rgba(255, 159, 64, 0.6)'
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: { position: 'top' }
+        },
+        scales: {
+            x: {
+                ticks: {
+                    autoSkip: false,
+                    maxRotation: 0,
+                    minRotation: 0
+                }
+            },
+            y: {
+                beginAtZero: true
+            }
+        },
+
+        onClick: function(evt, elements) {
+
+    if(elements.length > 0){
+
+        const index = elements[0].index;
+        const datasetIndex = elements[0].datasetIndex;
+
+        const nama = namaPegawai[index];
+
+        let html = "";
+
+        // =================
+        // TARGET (UNGU)
+        // =================
+        if(datasetIndex === 0){
+
+            const tugas = tugasPegawai[index] || [];
+
+            html += `<ul class="list-disc ml-5 space-y-1">`;
+
+            tugas.forEach(function(t){
+                html += `<li>${t}</li>`;
+            });
+
+            html += `</ul>`;
+
+            document.getElementById("modalPegawaiTitle").innerText =
+                "Daftar Tugas: " + nama;
+
+        }
+
+        // =================
+        // REALISASI (KUNING)
+        // =================
+        if(datasetIndex === 1){
+
+            const detail = realisasiDetail[index] || [];
+
+            html += `<div class="max-h-[500px] overflow-y-auto">
+                        <table class="w-full text-sm border">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="border px-2 py-1">Tugas</th>
+                                <th class="border px-2 py-1">Realisasi</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+
+            detail.forEach(function(d){
+                html += `
+                    <tr>
+                        <td class="border px-2 py-1">${d.nama}</td>
+                        <td class="border px-2 py-1 text-center">${d.realisasi}</td>
+                    </tr>
+                `;
+            });
+            html += `</tbody></table></div>`;
+
+            document.getElementById("modalPegawaiTitle").innerText =
+                "Realisasi Tugas: " + nama;
+        }
+
+        document.getElementById("modalPegawaiContent").innerHTML = html;
+
+        document.getElementById("modalPegawai").classList.remove("hidden");
+        document.getElementById("modalPegawai").classList.add("flex");
+    }
+}
+    }
+});
+
+
+// ============================
+// BUAT KETERANGAN A = PEGAWAI
+// ============================
+
+const containerPegawai = document.createElement('div');
+
+const totalPegawai = namaPegawai.length;
+const columnsPegawai = 3;
+const rowsPegawai = Math.ceil(totalPegawai / columnsPegawai);
+
+containerPegawai.className = `mt-4 grid grid-flow-col gap-3 text-sm text-gray-700`;
+containerPegawai.style.gridTemplateRows = `repeat(${rowsPegawai}, auto)`;
+
+namaPegawai.forEach((nama, index) => {
+
+    const row = document.createElement('div');
+
+    row.innerHTML = `
+        <div class="flex items-start gap-2">
+            <span class="w-6 h-6 flex items-center justify-center rounded-full bg-purple-100 text-purple-700 font-semibold text-xs">
+                ${labelsPegawai[index]}
+            </span>
+            <span>${nama}</span>
+        </div>
+    `;
+
+    containerPegawai.appendChild(row);
+});
+
+document.getElementById('grafikPerPegawai')
+    .parentNode
+    .appendChild(containerPegawai);
+
+
+// fungsi close modal
+function closeModalPegawai(){
+    document.getElementById("modalPegawai").classList.add("hidden");
+}
+
+</script>
 @endsection

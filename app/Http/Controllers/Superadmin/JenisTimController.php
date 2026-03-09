@@ -113,6 +113,7 @@ class JenisTimController extends Controller
         $request->validate(['file' => 'required|mimes:xlsx,xls']);
 
         Excel::import(new class implements ToModel, WithHeadingRow {
+            
             public function model(array $row)
             {
                 if (empty($row['nama_tim'])) {

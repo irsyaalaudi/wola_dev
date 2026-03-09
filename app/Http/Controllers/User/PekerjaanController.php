@@ -8,6 +8,8 @@ use App\Models\RealisasiTugas;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
+use App\Exports\TugasUserExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class PekerjaanController extends Controller
 {
@@ -60,6 +62,13 @@ class PekerjaanController extends Controller
             $tugasQuery->where('deadline', '<=', $request->end_date);
         }
 
+        // Filter Tim
+        if ($request->filled('tim')) {
+            $tugasQuery->whereHas('jenisPekerjaan.team', function ($q) use ($request) {
+                $q->where('id', $request->tim);
+            });
+        }
+
         $tugas = $tugasQuery->get();
 
         $timList = \App\Models\Team::whereHas('pegawais', function ($q) use ($pegawaiId) {
@@ -69,12 +78,12 @@ class PekerjaanController extends Controller
         foreach ($tugas as $t) {
             // total realisasi & progress
             $totalRealisasi = $t->semuaRealisasi->sum('realisasi');
-            $progress = $t->target > 0 ? ($totalRealisasi / $t->target) : 0;
+            $progress = $t->target > 0 ? min($totalRealisasi / $t->target, 1) : 0;
 
             // bobot dari jenis pekerjaan
             $bobot = $t->jenisPekerjaan->bobot ?? 0;
 
-            // keterlambatan
+            // Cek keterlambatan
             $realisasiSortir = $t->semuaRealisasi->sortBy('tanggal_realisasi');
 
             // Cari tanggal saat realisasi pertama kali mencapai 100%
@@ -172,7 +181,10 @@ class PekerjaanController extends Controller
             'status' => $totalRealisasi >= $tugas->target ? 'waiting_approval' : 'on_progress'
         ]);
 
-        return back()->with('success', 'Realisasi berhasil disimpan.');
+        return back()
+            ->with('success', 'Realisasi berhasil disimpan.')
+            ->with('scroll_to', $tugas_id);
+
     }
 
     public function updateRealisasi(Request $request, $id)
@@ -211,4 +223,40 @@ class PekerjaanController extends Controller
 
         return back()->with('success', 'Realisasi berhasil diupdate.');
     }
+
+
+public function export(Request $request)
+{
+    $query = Tugas::with(['jenisPekerjaan.team', 'semuaRealisasi'])
+        ->where('pegawai_id', auth()->user()->pegawai_id);
+
+    if ($request->bulan) {
+        $query->whereMonth('created_at', $request->bulan);
+    }
+
+    if ($request->tahun) {
+        $query->whereYear('created_at', $request->tahun);
+    }
+
+    if ($request->start_date) {
+        $query->whereDate('created_at', '>=', $request->start_date);
+    }
+
+    if ($request->end_date) {
+        $query->whereDate('created_at', '<=', $request->end_date);
+    }
+
+    if ($request->jenis_pekerjaan) {
+        $query->whereHas('jenisPekerjaan', function ($q) use ($request) {
+            $q->where('nama_pekerjaan', 'like', '%'.$request->jenis_pekerjaan.'%');
+        });
+    }
+
+    $tugas = $query->get();
+
+    return Excel::download(
+        new TugasUserExport($tugas),
+        'laporan_tugas_user.xlsx'
+    );
+}
 }

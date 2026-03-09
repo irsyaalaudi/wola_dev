@@ -265,4 +265,15 @@
       updateDisableState();
     });
   </script>
+
+@if(session('scroll_to'))
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const el = document.getElementById("tugas-{{ session('scroll_to') }}");
+        if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+    });
+  </script>
+@endif
 @endsection

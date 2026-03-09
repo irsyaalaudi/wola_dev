@@ -55,7 +55,7 @@
       </thead>
       <tbody>
         @forelse($tugas as $index => $t)
-        <tr class="text-center hover:bg-gray-50">
+        <tr id="tugas-{{ $t['id'] }}" class="text-center hover:bg-gray-50">
           <td class="px-3 py-2 border">{{ $index + 1 }}</td>
           <td class="px-3 py-2 border">{{ $t['pegawai'] }}</td>
           <td class="px-3 py-2 border">{{ $t['tim'] }}</td>
@@ -127,3 +127,13 @@
   © {{ date('Y') }} <strong>WOLA</strong>. All rights reserved.
 </footer>
 @endsection
+@if(session('scroll_to'))
+  <script>
+  document.addEventListener("DOMContentLoaded", function() {
+      const el = document.getElementById("tugas-{{ session('scroll_to') }}");
+      if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+  });
+  </script>
+@endif
