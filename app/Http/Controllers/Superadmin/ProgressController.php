@@ -9,38 +9,55 @@ use App\Models\Tugas;
 use Maatwebsite\Excel\Facades\Excel;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
+use App\Helpers\NilaiHelper;
 
 class ProgressController extends Controller
 {
     public function index()
     {
-        $pegawais = Pegawai::with(['user', 'tugas.semuaRealisasi', 'tugas.jenisPekerjaan'])->get();
-
+        //$pegawais = Pegawai::with(['user', 'tugas.semuaRealisasi', 'tugas.jenisPekerjaan'])->get();
+        // Pegawai::with([
+        //     'user',
+        //     'tugas' => function($q){
+        //         $q->where('status','done')
+        //         ->with(['semuaRealisasi','jenisPekerjaan']);
+        //     }
+        // ])->get();
+        $pegawais = Pegawai::with([
+            'user',
+            'tugas' => function($q) {
+                $q->where('status', 'done')
+                ->with(['semuaRealisasi', 'jenisPekerjaan']);
+            }
+        ])->get();
         foreach ($pegawais as $pegawai) {
             $totalNilai  = 0;
             $jumlahTugas = 0;
 
             foreach ($pegawai->tugas as $tugas) {
                 if ($tugas->status === 'done') {
-                    $approved = $tugas->semuaRealisasi->where('is_approved', true);
-                    $realisasi = $approved->sum('realisasi');
-                    $tglReal   = $approved->max('tanggal_realisasi');
-                    $target    = $tugas->target ?? 0;
-                    $progress  = $target > 0 ? min($realisasi / $target, 1) : 0;
+                    // $approved = $tugas->semuaRealisasi->where('is_approved', true);
+                    // $realisasi = $approved->sum('realisasi');
+                    // $tglReal   = $approved->max('tanggal_realisasi');
+                    // $target    = $tugas->target ?? 0;
+                    // $progress  = $target > 0 ? min($realisasi / $target, 1) : 0;
 
-                    $bobot     = $tugas->jenisPekerjaan->bobot ?? 0;
+                    // $bobot     = $tugas->jenisPekerjaan->bobot ?? 0;
 
-                    // penalti (opsional)
-                    $deadline  = $tugas->deadline;
-                    $hariTelat = 0;
-                    if ($deadline && $tglReal && strtotime($tglReal) > strtotime($deadline)) {
-                        $hariTelat = (new \Carbon\Carbon($deadline))->diffInDays(new \Carbon\Carbon($tglReal));
-                    }
-                    $penalti   = $bobot * 0.1 * $hariTelat;
+                    // // penalti (opsional)
+                    // $deadline  = $tugas->deadline;
+                    // $hariTelat = 0;
+                    // if ($deadline && $tglReal && strtotime($tglReal) > strtotime($deadline)) {
+                    //     $hariTelat = (new \Carbon\Carbon($deadline))->diffInDays(new \Carbon\Carbon($tglReal));
+                    // }
+                    // $penalti   = $bobot * 0.1 * $hariTelat;
 
-                    $nilaiAkhirTugas = max(0, ($bobot * $progress) - $penalti);
+                    // $nilaiAkhirTugas = max(0, ($bobot * $progress) - $penalti);
+                    $hasil = \App\Helpers\NilaiHelper::hitung($tugas);
 
-                    $totalNilai  += $nilaiAkhirTugas;
+                    // $nilaiAkhirTugas = $hasil['nilaiAkhir'];
+
+                    $totalNilai += $hasil['nilaiAkhir'];
                     $jumlahTugas++;
                 }
             }
@@ -102,43 +119,77 @@ class ProgressController extends Controller
             {
                 $tugas = Tugas::with(['pegawai.user', 'semuaRealisasi', 'jenisPekerjaan.teams'])->get();
 
+                // return $tugas->map(function ($tugas, $index) {
+                //     // hitung nilai akhir per tugas
+
+
+                //     $target    = $tugas->target ?? 0;
+                //     $approved = $tugas->semuaRealisasi->where('is_approved', true);
+                //     $realisasi = $approved->sum('realisasi');
+                //     $tglReal = $approved->max('tanggal_realisasi');
+                //     $progress  = $target > 0 ? min($realisasi / $target, 1) : 0;
+                //     $bobot     = $tugas->jenisPekerjaan->bobot ?? 0;
+
+                //     $deadline  = $tugas->deadline;
+                //     $tglReal = $approved->max('tanggal_realisasi');
+                //     $hariTelat = 0;
+                //     if ($deadline && $tglReal && strtotime($tglReal) > strtotime($deadline)) {
+                //         $hariTelat = (new \Carbon\Carbon($deadline))->diffInDays(new \Carbon\Carbon($tglReal));
+                //     }
+                //     $penalti = $bobot * 0.1 * $hariTelat;
+                //     $hasil = \App\Helpers\NilaiHelper::hitung($tugas);
+
+                //     $bobot = $hasil['bobot'];
+                //     $nilaiAkhirTugas = $hasil['nilaiAkhir'];
+                
+
+                //     //$nilaiAkhirTugas = max(0, ($bobot * $progress) - $penalti);
+
+                //     return [
+                //         'No'                => $index + 1,
+                //         'Nama Pegawai'      => $tugas->pegawai->user->name ?? '-',
+                //         'Nama Pekerjaan'    => $tugas->jenisPekerjaan->nama_pekerjaan ?? '-',
+                //         'Nama Tim'          => $tugas->jenisPekerjaan->team->nama_tim ?? '-',
+                //         'Asal'              => $tugas->asal ?? '-',
+                //         'Target'            => $tugas->target ?? 0,
+                //         'Realisasi'         => $realisasi,
+                //         'Satuan'            => $tugas->jenisPekerjaan->satuan ?? '-',
+                //         'Deadline'          => $tugas->deadline
+                //             ? date('d-m-Y', strtotime($tugas->deadline)) : '-',
+                //         'Tanggal Realisasi' => $tglReal ? date('d-m-Y', strtotime($tglReal)) : '-',
+                //         'Bobot'             => $bobot,
+                //         'Nilai Akhir'       => round($nilaiAkhirTugas, 2),
+                //         'Catatan' => $approved->last()?->catatan ?? '-',
+                //         'Bukti'   => $approved->last()?->file_bukti ?? '-',
+                //     ];
+                // });
+
                 return $tugas->map(function ($tugas, $index) {
-                    // hitung nilai akhir per tugas
-                    $target    = $tugas->target ?? 0;
-                    $approved = $tugas->semuaRealisasi->where('is_approved', true);
-                    $realisasi = $approved->sum('realisasi');
-                    $tglReal = $approved->max('tanggal_realisasi');
-                    $progress  = $target > 0 ? min($realisasi / $target, 1) : 0;
-                    $bobot     = $tugas->jenisPekerjaan->bobot ?? 0;
 
-                    $deadline  = $tugas->deadline;
-                    $tglReal = $approved->max('tanggal_realisasi');
-                    $hariTelat = 0;
-                    if ($deadline && $tglReal && strtotime($tglReal) > strtotime($deadline)) {
-                        $hariTelat = (new \Carbon\Carbon($deadline))->diffInDays(new \Carbon\Carbon($tglReal));
-                    }
-                    $penalti = $bobot * 0.1 * $hariTelat;
+                $approved = $tugas->semuaRealisasi->where('is_approved', true);
 
-                    $nilaiAkhirTugas = max(0, ($bobot * $progress) - $penalti);
+                $realisasi = $approved->sum('realisasi');
+                $tglReal   = $approved->max('tanggal_realisasi');
 
-                    return [
-                        'No'                => $index + 1,
-                        'Nama Pegawai'      => $tugas->pegawai->user->name ?? '-',
-                        'Nama Pekerjaan'    => $tugas->jenisPekerjaan->nama_pekerjaan ?? '-',
-                        'Nama Tim'          => $tugas->jenisPekerjaan->team->nama_tim ?? '-',
-                        'Asal'              => $tugas->asal ?? '-',
-                        'Target'            => $tugas->target ?? 0,
-                        'Realisasi'         => $realisasi,
-                        'Satuan'            => $tugas->jenisPekerjaan->satuan ?? '-',
-                        'Deadline'          => $tugas->deadline
-                            ? date('d-m-Y', strtotime($tugas->deadline)) : '-',
-                        'Tanggal Realisasi' => $tglReal ? date('d-m-Y', strtotime($tglReal)) : '-',
-                        'Bobot'             => $bobot,
-                        'Nilai Akhir'       => round($nilaiAkhirTugas, 2),
-                        'Catatan' => $approved->last()?->catatan ?? '-',
-                        'Bukti'   => $approved->last()?->file_bukti ?? '-',
-                    ];
-                });
+                $hasil = \App\Helpers\NilaiHelper::hitung($tugas);
+
+                return [
+                    'No' => $index + 1,
+                    'Nama Pegawai' => $tugas->pegawai->user->name ?? '-',
+                    'Nama Pekerjaan' => $tugas->jenisPekerjaan->nama_pekerjaan ?? '-',
+                    'Nama Tim' => $tugas->jenisPekerjaan->teams->first()->nama_tim ?? '-',
+                    'Asal' => $tugas->asal ?? '-',
+                    'Target' => $tugas->target ?? 0,
+                    'Realisasi' => $realisasi,
+                    'Satuan' => $tugas->jenisPekerjaan->satuan ?? '-',
+                    'Deadline' => $tugas->deadline ? date('d-m-Y', strtotime($tugas->deadline)) : '-',
+                    'Tanggal Realisasi' => $tglReal ? date('d-m-Y', strtotime($tglReal)) : '-',
+                    'Bobot' => $hasil['bobot'],
+                    'Nilai Akhir' => $hasil['nilaiAkhir'],
+                    'Catatan' => $approved->last()?->catatan ?? '-',
+                    'Bukti' => $approved->last()?->file_bukti ?? '-',
+                ];
+            });
             }
 
             public function headings(): array

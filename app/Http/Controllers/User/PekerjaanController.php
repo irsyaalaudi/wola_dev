@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
 use App\Exports\TugasUserExport;
 use Maatwebsite\Excel\Facades\Excel;
+use App\Helpers\NilaiHelper;
 
 class PekerjaanController extends Controller
 {
@@ -64,7 +65,7 @@ class PekerjaanController extends Controller
 
         // Filter Tim
         if ($request->filled('tim')) {
-            $tugasQuery->whereHas('jenisPekerjaan.team', function ($q) use ($request) {
+            $tugasQuery->whereHas('jenisPekerjaan.teams', function ($q) use ($request) {
                 $q->where('id', $request->tim);
             });
         }
@@ -113,15 +114,11 @@ class PekerjaanController extends Controller
                 }
             }
 
-            $penalti = $bobot * 0.05 * $hariTelat;
+            $nilai = NilaiHelper::hitung($t);
 
-            // nilai akhir (bobot * progress – penalti)
-            $nilaiAkhir = max(0, ($bobot * $progress) - $penalti);
-
-            // atribut untuk Blade
-            $t->setAttribute('bobot_asli', $bobot);
-            $t->setAttribute('penalti', $penalti);
-            $t->setAttribute('nilai_akhir', $nilaiAkhir);
+            $t->setAttribute('bobot_asli', $nilai['bobot']);
+            $t->setAttribute('penalti', $nilai['penalti']);
+            $t->setAttribute('nilai_akhir', $nilai['nilaiAkhir']);
 
             $t->setAttribute(
                 'is_late',
@@ -225,38 +222,38 @@ class PekerjaanController extends Controller
     }
 
 
-public function export(Request $request)
-{
-    $query = Tugas::with(['jenisPekerjaan.team', 'semuaRealisasi'])
-        ->where('pegawai_id', auth()->user()->pegawai_id);
+    public function export(Request $request)
+    {
+        $query = Tugas::with(['jenisPekerjaan.teams', 'semuaRealisasi'])
+            ->where('pegawai_id', auth()->user()->pegawai->id);
 
-    if ($request->bulan) {
-        $query->whereMonth('created_at', $request->bulan);
+        if ($request->bulan) {
+            $query->whereMonth('created_at', $request->bulan);
+        }
+
+        if ($request->tahun) {
+            $query->whereYear('created_at', $request->tahun);
+        }
+
+        if ($request->start_date) {
+            $query->whereDate('created_at', '>=', $request->start_date);
+        }
+
+        if ($request->end_date) {
+            $query->whereDate('created_at', '<=', $request->end_date);
+        }
+
+        if ($request->jenis_pekerjaan) {
+            $query->whereHas('jenisPekerjaan', function ($q) use ($request) {
+                $q->where('nama_pekerjaan', 'like', '%'.$request->jenis_pekerjaan.'%');
+            });
+        }
+
+        $tugas = $query->get();
+
+        return Excel::download(
+            new \App\Exports\TugasUserExport($tugas),
+            'laporan_tugas_user.xlsx'
+        );
     }
-
-    if ($request->tahun) {
-        $query->whereYear('created_at', $request->tahun);
-    }
-
-    if ($request->start_date) {
-        $query->whereDate('created_at', '>=', $request->start_date);
-    }
-
-    if ($request->end_date) {
-        $query->whereDate('created_at', '<=', $request->end_date);
-    }
-
-    if ($request->jenis_pekerjaan) {
-        $query->whereHas('jenisPekerjaan', function ($q) use ($request) {
-            $q->where('nama_pekerjaan', 'like', '%'.$request->jenis_pekerjaan.'%');
-        });
-    }
-
-    $tugas = $query->get();
-
-    return Excel::download(
-        new TugasUserExport($tugas),
-        'laporan_tugas_user.xlsx'
-    );
-}
 }

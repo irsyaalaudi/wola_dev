@@ -64,19 +64,25 @@
           <td class="text-left px-3 py-2"> {{ optional(optional($t->jenisPekerjaan)->team)->nama_tim ?? '-' }}</td>
           <td class="text-left px-3 py-2">{{ $t->asal ?? '-' }}</td>
           <td class="px-3 py-2">{{ $t->target ?? '-' }}</td>
-          <td class="px-3 py-2">{{ optional($t->realisasi)->realisasi ?? '-' }}</td>
+          <td class="px-3 py-2">{{ $t->semuaRealisasi->where('is_approved',true)->sum('realisasi') ?? '-' }}</td>
           <td class="px-3 py-2">{{ $t->jenisPekerjaan->satuan ?? '-' }}</td>
           <td class="px-3 py-2 text-red-600">
             {{ $t->deadline ? \Carbon\Carbon::parse($t->deadline)->format('d M Y') : '-' }}
           </td>
           <td class="px-3 py-2">
-            {{ optional(optional($t->realisasi)->tanggal_realisasi) 
-               ? \Carbon\Carbon::parse($t->realisasi->tanggal_realisasi)->format('d M Y') : '-' }}
+            {{-- {{ optional(optional($t->realisasi)->tanggal_realisasi) 
+               ? \Carbon\Carbon::parse($t->realisasi->tanggal_realisasi)->format('d M Y') : '-' }} --}}
+               @php
+              $realisasiTerakhir = $t->semuaRealisasi->where('is_approved',true)->sortByDesc('tanggal_realisasi')->first();
+              @endphp
+
+              {{ $realisasiTerakhir ? \Carbon\Carbon::parse($realisasiTerakhir->tanggal_realisasi)->format('d M Y') : '-' }}
           </td>
           <td>{{ $t->jenisPekerjaan->bobot ?? '-' }}</td>
           <td>
             {{-- ambil dari tabel progress atau langsung hitung --}}
-            {{ \App\Models\Progress::where('pegawai_id',$t->pegawai_id)->value('nilai_akhir') ?? 0 }}
+            {{-- {{ \App\Models\Progress::where('pegawai_id',$t->pegawai_id)->value('nilai_akhir') ?? 0 }} --}}
+            {{ \App\Helpers\NilaiHelper::hitung($t)['nilaiAkhir'] }}
           </td>
           <td class="text-left px-3 py-2 text-gray-500 italic">{{ optional($t->realisasi)->catatan ?? '-' }}</td>
           <td class="px-3 py-2">

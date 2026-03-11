@@ -7,6 +7,7 @@ use App\Models\Tugas;
 use Carbon\Carbon;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\TemplateTugasExport;
+use App\Helpers\NilaiHelper;
 
 class PekerjaanController extends Controller
 {
@@ -70,33 +71,38 @@ class PekerjaanController extends Controller
             // Ambil realisasi yang sudah approved
             $approvedRealisasi = $t->semuaRealisasi->where('is_approved', true);
 
-            $totalRealisasi = $approvedRealisasi->sum('realisasi');
-            $progress = $t->target > 0 ? min($totalRealisasi / $t->target, 1) : 0;
+            // $totalRealisasi = $approvedRealisasi->sum('realisasi');
+            // $progress = $t->target > 0 ? min($totalRealisasi / $t->target, 1) : 0;
 
-            // Bobot dari jenis pekerjaan
-            $bobot = $t->jenisPekerjaan->bobot ?? 0;
+            // // Bobot dari jenis pekerjaan
+            // $bobot = $t->jenisPekerjaan->bobot ?? 0;
 
-            // Keterlambatan (dari realisasi terakhir yang approved)
-            $lastDate = $approvedRealisasi->max('tanggal_realisasi');
-            $hariTelat = 0;
-            if ($lastDate && Carbon::parse($lastDate)->gt(Carbon::parse($t->deadline))) {
-                $hariTelat = Carbon::parse($lastDate)->diffInDays(Carbon::parse($t->deadline));
-            }
+            // // Keterlambatan (dari realisasi terakhir yang approved)
+            // $lastDate = $approvedRealisasi->max('tanggal_realisasi');
+            // $hariTelat = 0;
+            // if ($lastDate && Carbon::parse($lastDate)->gt(Carbon::parse($t->deadline))) {
+            //     $hariTelat = Carbon::parse($lastDate)->diffInDays(Carbon::parse($t->deadline));
+            // }
 
-            // Penalti 10% per hari keterlambatan
-            $penalti = $bobot * 0.1 * $hariTelat;
+            // // Penalti 10% per hari keterlambatan
+            // $penalti = $bobot * 0.1 * $hariTelat;
 
-            // Nilai akhir
-            $nilaiAkhir = max(0, ($bobot * $progress) - $penalti);
+            // // Nilai akhir
+            // $nilaiAkhir = max(0, ($bobot * $progress) - $penalti);
+            $hasil = \App\Helpers\NilaiHelper::hitung($t);
+
+            $t->bobot = $hasil['bobot'];
+            $t->hariTelat = $hasil['hariTelat'];
+            $t->nilaiAkhir = $hasil['nilaiAkhir'];
 
             // 🔹 Nama tim pemberi tugas (bukan semua tim pegawai)
-            $namaTim = $t->jenisPekerjaan->team->nama_tim ?? '-';
+            // $namaTim = $t->jenisPekerjaan->team->nama_tim ?? '-';
 
-            // Tambahkan properti baru ke model
-            $t->bobot       = $bobot;
-            $t->hariTelat   = $hariTelat;
-            $t->nilaiAkhir  = round($nilaiAkhir, 2);
-            $t->namaTim     = $namaTim;
+            // // Tambahkan properti baru ke model
+            // $t->bobot       = $bobot;
+            // $t->hariTelat   = $hariTelat;
+            // $t->nilaiAkhir  = round($nilaiAkhir, 2);
+            // $t->namaTim     = $namaTim;
 
             return $t;
         });

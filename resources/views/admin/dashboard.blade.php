@@ -138,19 +138,18 @@
 <div x-show="showChart" x-transition class="mt-6 space-y-6">
 
     {{-- Grafik 1 --}}
-    <div class="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+    {{-- <div class="bg-white rounded-xl shadow-md border border-gray-200 p-6">
         <h3 class="text-lg font-semibold text-gray-700 mb-4">
             Realisasi vs Target ({{ $labelBulanTahun }})
         </h3>
         <canvas id="grafikRealisasiTarget" height="120"></canvas>
-    </div>
+    </div> --}}
 
     {{-- Grafik 2 --}}
     <div class="bg-white rounded-xl shadow-md border border-gray-200 p-6">
         <h3 class="text-lg font-semibold text-gray-700 mb-4">
             Realisasi vs Target per Pegawai ({{ $labelBulanTahun }})
         </h3>
-        <canvas id="grafikPerPegawai" height="120"></canvas>
         <canvas id="grafikPerPegawai" height="120"></canvas>
 
 <!-- MODAL DETAIL PEGAWAI -->
@@ -187,12 +186,13 @@
 </footer>
 
 {{-- Script Chart.js --}}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{{-- <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
     const ctx = document.getElementById('grafikRealisasiTarget').getContext('2d');
 
     const namaTugas = @json($grafikLabels) || [];
+    const tugasDetail = @json($grafikTugasDetail) || [];
 
     // Buat label A, B, C, D...
     const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -200,7 +200,7 @@
         return alphabet[index] ?? `X${index+1}`;
     });
 
-    new Chart(ctx, {
+    const chartTugas = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: labels,
@@ -236,6 +236,52 @@
                     beginAtZero: true
                 }
             }
+            onClick: function(evt, elements) {
+
+    if(elements.length > 0){
+
+        const index = elements[0].index;
+        const namaTugasKlik = namaTugas[index];
+
+        const detail = tugasDetail[index] || [];
+
+        let html = `
+        <div class="max-h-[500px] overflow-y-auto">
+        <table class="w-full text-sm border">
+        <thead class="bg-gray-100">
+        <tr>
+        <th class="border px-2 py-1">No</th>
+        <th class="border px-2 py-1">Pegawai</th>
+        <th class="border px-2 py-1">Realisasi</th>
+        </tr>
+        </thead>
+        <tbody>
+        `;
+
+        detail.forEach(function(d,i){
+
+            html += `
+            <tr>
+            <td class="border px-2 py-1 text-center">${i+1}</td>
+            <td class="border px-2 py-1">${d.pegawai}</td>
+            <td class="border px-2 py-1 text-center">${d.realisasi}</td>
+            </tr>
+            `;
+
+        });
+
+        html += `</tbody></table></div>`;
+
+        document.getElementById("modalPegawaiTitle").innerText =
+            "Detail Tugas: " + namaTugasKlik;
+
+        document.getElementById("modalPegawaiContent").innerHTML = html;
+
+        document.getElementById("modalPegawai").classList.remove("hidden");
+        document.getElementById("modalPegawai").classList.add("flex");
+    }
+
+}
         }
     });
 
@@ -264,7 +310,7 @@ container.style.gridTemplateRows = `repeat(${rows}, auto)`;
     });
 
     document.getElementById('grafikRealisasiTarget').parentNode.appendChild(container);
-</script>
+</script> --}}
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -358,18 +404,20 @@ const chartPegawai = new Chart(ctxPegawai, {
             html += `<div class="max-h-[500px] overflow-y-auto">
                         <table class="w-full text-sm border">
                         <thead class="bg-gray-100">
-                            <tr>
-                                <th class="border px-2 py-1">Tugas</th>
-                                <th class="border px-2 py-1">Realisasi</th>
-                            </tr>
+                        <tr>
+                        <th class="border px-2 py-1">No</th>
+                        <th class="border px-2 py-1">Tugas</th>
+                        <th class="border px-2 py-1">Realisasi</th>
+                        </tr>
                         </thead>
                         <tbody>`;
 
-            detail.forEach(function(d){
+            detail.forEach(function(d,i){
                 html += `
                     <tr>
-                        <td class="border px-2 py-1">${d.nama}</td>
-                        <td class="border px-2 py-1 text-center">${d.realisasi}</td>
+                    <td class="border px-2 py-1 text-center">${i+1}</td>
+                    <td class="border px-2 py-1">${d.nama}</td>
+                    <td class="border px-2 py-1 text-center">${d.realisasi}</td>
                     </tr>
                 `;
             });

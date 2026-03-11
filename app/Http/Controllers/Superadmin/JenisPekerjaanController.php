@@ -11,6 +11,9 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use Maatwebsite\Excel\Concerns\ToModel;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
+use App\Exports\TemplateJenisPekerjaanExport;
+use App\Imports\JenisPekerjaanImport;
+
 
 class JenisPekerjaanController extends Controller
 {
@@ -171,48 +174,71 @@ class JenisPekerjaanController extends Controller
         }, 'jenis_pekerjaan.xlsx');
     }
 
-    public function import(Request $request)
+
+
+    public function downloadTemplate()
     {
-        $request->validate([
-            'file' => 'required|mimes:xlsx,xls'
-        ]);
-
-        Excel::import(new class implements \Maatwebsite\Excel\Concerns\OnEachRow, WithHeadingRow {
-            public function onRow(\Maatwebsite\Excel\Row $row)
-            {
-                $data = $row->toArray();
-
-                if (empty($data['nama_pekerjaan']) && empty($data['nama pekerjaan'])) {
-                    return;
-                }
-
-                // logika cari team tetap sama seperti sebelumnya
-                $team = null;
-                $teamName = $data['tim'] ?? $data['nama_tim'] ?? null;
-                if ($teamName) {
-                    $cleanName = preg_replace('/\s+/u', ' ', trim($teamName));
-                    $cleanName = preg_replace('/[[:^print:]]/u', '', $cleanName);
-                    $team = Team::whereRaw('LOWER(nama_tim) = ?', [strtolower($cleanName)])->first();
-                }
-
-                $bobot = $data['bobot'] ?? 0;
-                $bobot = str_replace(',', '.', (string) $bobot);
-                if (!is_numeric($bobot))
-                    $bobot = 0;
-
-                $jenis = JenisPekerjaan::create([
-                    'nama_pekerjaan' => $data['nama_pekerjaan'] ?? $data['nama pekerjaan'] ?? null,
-                    'satuan' => $data['satuan'] ?? null,
-                    'bobot' => floatval($bobot),
-                    'pemberi_pekerjaan' => $data['pemberi_pekerjaan'] ?? $data['pemberi pekerjaan'] ?? null,
-                ]);
-
-                if ($team) {
-                    $jenis->teams()->sync([$team->id]);
-                }
-            }
-        }, $request->file('file'));
-
-        return back()->with('success', 'Data Jenis Pekerjaan berhasil diimport.');
+        return Excel::download(
+            new TemplateJenisPekerjaanExport,
+            'Template_Jenis_Pekerjaan.xlsx'
+        );
     }
+
+    // public function import(Request $request)
+    // {
+    //     $request->validate([
+    //         'file' => 'required|mimes:xlsx,xls'
+    //     ]);
+
+    //     Excel::import(new class implements \Maatwebsite\Excel\Concerns\OnEachRow, WithHeadingRow {
+    //         public function onRow(\Maatwebsite\Excel\Row $row)
+    //         {
+    //             $data = $row->toArray();
+
+    //             if (empty($data['nama_pekerjaan']) && empty($data['nama pekerjaan'])) {
+    //                 return;
+    //             }
+
+    //             // logika cari team tetap sama seperti sebelumnya
+    //             $team = null;
+    //             $teamName = $data['tim'] ?? $data['nama_tim'] ?? null;
+    //             if ($teamName) {
+    //                 $cleanName = preg_replace('/\s+/u', ' ', trim($teamName));
+    //                 $cleanName = preg_replace('/[[:^print:]]/u', '', $cleanName);
+    //                 $team = Team::whereRaw('LOWER(nama_tim) = ?', [strtolower($cleanName)])->first();
+    //             }
+
+    //             $bobot = $data['bobot'] ?? 0;
+    //             $bobot = str_replace(',', '.', (string) $bobot);
+    //             if (!is_numeric($bobot))
+    //                 $bobot = 0;
+
+    //             $jenis = JenisPekerjaan::create([
+    //                 'nama_pekerjaan' => $data['nama_pekerjaan'] ?? $data['nama pekerjaan'] ?? null,
+    //                 'satuan' => $data['satuan'] ?? null,
+    //                 'bobot' => floatval($bobot),
+    //                 'pemberi_pekerjaan' => $data['pemberi_pekerjaan'] ?? $data['pemberi pekerjaan'] ?? null,
+    //             ]);
+
+    //             if ($team) {
+    //                 $jenis->teams()->sync([$team->id]);
+    //             }
+    //         }
+    //     }, $request->file('file'));
+
+    //     return back()->with('success', 'Data Jenis Pekerjaan berhasil diimport.');
+    // }
+
+
+public function import(Request $request)
+{
+    $request->validate([
+        'file' => 'required|mimes:xlsx,xls'
+    ]);
+
+    Excel::import(new JenisPekerjaanImport, $request->file('file'));
+
+    return back()->with('success','Import berhasil');
+}
+    
 }

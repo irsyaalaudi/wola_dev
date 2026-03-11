@@ -48,7 +48,8 @@
             <div>
               <h5 class="font-semibold text-md">Dokumentasi Website WOLA</h5>
               <p class="text-sm text-gray-600">Baca panduan resmi penggunaan sistem secara menyeluruh.</p>
-              <a href="#" class="inline-block mt-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded text-sm transition">
+              <a href="{{ asset('Guidebook_Wola.pdf') }}" 
+              target="_blank" class="inline-block mt-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded text-sm transition">
                 Baca Dokumentasi
               </a>
             </div>

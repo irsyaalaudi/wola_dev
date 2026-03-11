@@ -13,10 +13,14 @@ class JenisPekerjaan extends Model
     ];
 
     public function teams()
-    {
-        return $this->belongsToMany(Team::class, 'jenis_pekerjaan_teams', 'jenis_pekerjaan_id', 'team_id')
-                    ->withTimestamps();
-    }
+{
+    return $this->belongsToMany(
+        Team::class,
+        'jenis_pekerjaan_teams',
+        'jenis_pekerjaan_id',
+        'team_id'
+    );
+}
 
     public function getTeamAttribute()
     {

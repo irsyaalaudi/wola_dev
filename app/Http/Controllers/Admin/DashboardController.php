@@ -12,6 +12,7 @@ use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
+use App\Helpers\NilaiHelper;
 
 class DashboardController extends Controller
 {
@@ -70,21 +71,76 @@ class DashboardController extends Controller
             });
         }
 
+        
         $tasks = $tasksQuery->get();
 
         // Transform tugas
         $tasks->transform(fn($t) => $this->calculateTask($t));
 
-        $totalTugas      = $tasks->count();
-        $tugasSelesai       = $tasks->where('status', 'done')->count();
-        $tugasOngoing       = $tasks->where('status', 'on_progress')->count();
-        $tugasBelum         = $tasks->where('status', 'pending')->count();
-        $tugasWaitingApproval = $tasks->where('status', 'waiting_approval')->count();
+        $pegawaiSummary = $tasks->groupBy('pegawai_id')->map(function ($items) {
+
+    return [
+        'nama' => $items->first()->pegawai->nama ?? '-',
+
+        'target' => $items->sum('totalTarget'),
+
+        'realisasi' => $items->sum('totalRealisasi'),
+
+        // daftar tugas
+        'tugas' => $items->map(function ($task) {
+            return $task->jenisPekerjaan->nama_pekerjaan ?? '-';
+        })->values()->toArray(),
+
+        // detail realisasi
+        'realisasi_detail' => $items->map(function ($task) {
+            return [
+                'nama' => $task->jenisPekerjaan->nama_pekerjaan ?? '-',
+                'realisasi' => $task->semuaRealisasi->sum('realisasi')
+            ];
+        })->values()->toArray()
+    ];
+});
+
+        $totalTugas = $tasks->count();
+
+        $tugasSelesai = $tasks->filter(fn($t) =>
+            $t->totalRealisasi >= $t->totalTarget
+        )->count();
+
+        $tugasOngoing = $tasks->filter(fn($t) =>
+            $t->totalRealisasi > 0 && $t->totalRealisasi < $t->totalTarget
+        )->count();
+
+        $tugasBelum = $tasks->filter(fn($t) =>
+            $t->totalRealisasi == 0
+        )->count();
+
+        $tugasWaitingApproval = $tasks->filter(fn($t) =>
+            $t->semuaRealisasi->where('is_approved', false)->count() > 0
+        )->count();
         $rataNilaiAkhir  = $totalTugas > 0 ? round($tasks->avg('nilaiAkhir'), 2) : 0;
+
+        $grafikPegawaiLabels = $pegawaiSummary->pluck('nama')->values()->toArray();
+        $grafikPegawaiTarget = $pegawaiSummary->pluck('target')->values()->toArray();
+        $grafikPegawaiRealisasi = $pegawaiSummary->pluck('realisasi')->values()->toArray();
+        $grafikPegawaiTugas = $pegawaiSummary->pluck('tugas')->values()->toArray();
+        $grafikPegawaiRealisasiDetail = $pegawaiSummary->pluck('realisasi_detail')->values()->toArray();
 
         $grafikLabels    = $tasks->pluck('jenisPekerjaan.nama_pekerjaan')->toArray();
         $grafikTarget    = $tasks->pluck('totalTarget')->toArray();
         $grafikRealisasi = $tasks->pluck('totalRealisasi')->toArray();
+        $grafikTugasDetail = $tasks->map(function ($t) {
+
+            return $t->semuaRealisasi->map(function ($r) use ($t) {
+
+                return [
+                    'pegawai' => $t->pegawai->nama ?? '-',
+                    'realisasi' => $r->realisasi
+                ];
+
+            })->values()->toArray();
+
+        })->values()->toArray();
 
         return view('admin.dashboard', compact(
             'members',
@@ -98,6 +154,14 @@ class DashboardController extends Controller
             'grafikLabels',
             'grafikTarget',
             'grafikRealisasi',
+            'grafikTugasDetail',
+
+            'grafikPegawaiLabels',
+            'grafikPegawaiTarget',
+            'grafikPegawaiRealisasi',
+            'grafikPegawaiTugas',
+            'grafikPegawaiRealisasiDetail',
+            
             'labelBulanTahun'
         ));
     }
@@ -260,55 +324,73 @@ class DashboardController extends Controller
     /**
      * Perhitungan tugas (agar konsisten untuk index & export)
      */
+    // private function calculateTask($t)
+    // {
+    //     $approved = $t->semuaRealisasi->where('is_approved', true);
+    //     $totalRealisasi = $approved->sum('realisasi');
+    //     $progress = $t->target > 0 ? min($totalRealisasi / $t->target, 1) : 0;
+    //     $bobot = $t->jenisPekerjaan->bobot ?? 0;
+
+    //     $realisasiSortir = $t->semuaRealisasi->sortBy('tanggal_realisasi');
+    //     $akumulasiCek = 0;
+    //     $tanggalSelesai = null;
+    //     foreach ($realisasiSortir as $r) {
+    //         $akumulasiCek += $r->realisasi;
+    //         if ($akumulasiCek >= $t->target) {
+    //             $tanggalSelesai = $r->tanggal_realisasi;
+    //             break;
+    //         }
+    //     }
+
+    //     $selesaiTepat = $tanggalSelesai && !Carbon::parse($tanggalSelesai)->gt(Carbon::parse($t->deadline));
+
+    //     $hariTelat = 0;
+    //     $penalti = 0;
+
+    //     if (!$selesaiTepat) {
+    //         $realisasiTelat = $realisasiSortir->first(function ($r) use ($t) {
+    //             return Carbon::parse($r->tanggal_realisasi)->gt(Carbon::parse($t->deadline));
+    //         });
+
+    //         if ($realisasiTelat) {
+    //             $hariTelat = Carbon::parse($t->deadline)
+    //                 ->diffInDays(Carbon::parse($realisasiTelat->tanggal_realisasi));
+    //         } elseif ($totalRealisasi < $t->target) {
+    //             if (Carbon::now()->gt(Carbon::parse($t->deadline))) {
+    //                 $hariTelat = Carbon::parse($t->deadline)->diffInDays(Carbon::now());
+    //             }
+    //         }
+
+    //         // Penalti 5% per hari keterlambatan dikalikan bobot
+    //         $penalti = $bobot * 0.05 * $hariTelat;
+    //     }
+    //     $nilaiAkhir = max(0, ($bobot * $progress) - $penalti);
+
+    //     $t->namaTim        = $t->jenisPekerjaan->teams->first()->nama_tim ?? '-';
+    //     $t->bobot          = $bobot;
+    //     $t->hariTelat      = $hariTelat;
+    //     $t->nilaiAkhir     = round($nilaiAkhir, 2);
+    //     $t->totalTarget    = $t->target ?? 0;
+    //     $t->totalRealisasi = $totalRealisasi ?? 0;
+
+    //     return $t;
+    // }
     private function calculateTask($t)
-    {
-        $approved = $t->semuaRealisasi->where('is_approved', true);
-        $totalRealisasi = $approved->sum('realisasi');
-        $progress = $t->target > 0 ? min($totalRealisasi / $t->target, 1) : 0;
-        $bobot = $t->jenisPekerjaan->bobot ?? 0;
+{
+    $hasil = \App\Helpers\NilaiHelper::hitung($t);
 
-        $realisasiSortir = $t->semuaRealisasi->sortBy('tanggal_realisasi');
-        $akumulasiCek = 0;
-        $tanggalSelesai = null;
-        foreach ($realisasiSortir as $r) {
-            $akumulasiCek += $r->realisasi;
-            if ($akumulasiCek >= $t->target) {
-                $tanggalSelesai = $r->tanggal_realisasi;
-                break;
-            }
-        }
+    $t->namaTim = $t->jenisPekerjaan->teams->first()->nama_tim ?? '-';
 
-        $selesaiTepat = $tanggalSelesai && !Carbon::parse($tanggalSelesai)->gt(Carbon::parse($t->deadline));
+    $t->bobot = $hasil['bobot'];
 
-        $hariTelat = 0;
-        $penalti = 0;
+    $t->hariTelat = $hasil['hariTelat'];
 
-        if (!$selesaiTepat) {
-            $realisasiTelat = $realisasiSortir->first(function ($r) use ($t) {
-                return Carbon::parse($r->tanggal_realisasi)->gt(Carbon::parse($t->deadline));
-            });
+    $t->nilaiAkhir = $hasil['nilaiAkhir'];
 
-            if ($realisasiTelat) {
-                $hariTelat = Carbon::parse($t->deadline)
-                    ->diffInDays(Carbon::parse($realisasiTelat->tanggal_realisasi));
-            } elseif ($totalRealisasi < $t->target) {
-                if (Carbon::now()->gt(Carbon::parse($t->deadline))) {
-                    $hariTelat = Carbon::parse($t->deadline)->diffInDays(Carbon::now());
-                }
-            }
+    $t->totalTarget = $t->target ?? 0;
 
-            // Penalti 5% per hari keterlambatan dikalikan bobot
-            $penalti = $bobot * 0.05 * $hariTelat;
-        }
-        $nilaiAkhir = max(0, ($bobot * $progress) - $penalti);
+    $t->totalRealisasi = $hasil['totalRealisasi'];
 
-        $t->namaTim        = $t->jenisPekerjaan->team->nama_tim ?? '-';
-        $t->bobot          = $bobot;
-        $t->hariTelat      = $hariTelat;
-        $t->nilaiAkhir     = round($nilaiAkhir, 2);
-        $t->totalTarget    = $t->target ?? 0;
-        $t->totalRealisasi = $totalRealisasi ?? 0;
-
-        return $t;
-    }
+    return $t;
+}
 }

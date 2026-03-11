@@ -27,6 +27,19 @@
           </button>
         </form>
 
+        {{-- Download Template --}}
+        <a href="{{ route('admin.pekerjaan.template') }}"
+        class="inline-flex items-center px-4 py-2 rounded-lg border border-purple-400 text-purple-600 font-medium
+        hover:bg-purple-600 hover:text-white transition">
+        <i class="fas fa-download mr-2"></i> Template
+        </a>
+
+        {{-- Upload Excel --}}
+        <button @click="openImport = true"
+        class="px-4 py-2 bg-blue-600 text-white rounded-lg">
+        Import Excel
+        </button>
+
         {{-- Export --}}
         <a href="{{ route('admin.pekerjaan.export') }}"
           class="inline-flex items-center px-4 py-2 rounded-lg border border-green-400 text-green-600 font-medium bg-green-200/20 hover:bg-green-300/30 hover:border-green-500 hover:text-green-700 transition duration-200 transform hover:scale-105">
@@ -48,6 +61,16 @@
       </div>
     @endif
 
+    @if ($errors->any())
+    <div class="mb-4 bg-red-100 text-red-700 px-4 py-2 rounded border border-red-200">
+    <ul class="list-disc pl-5">
+    @foreach ($errors->all() as $error)
+    <li>{{ $error }}</li>
+    @endforeach
+    </ul>
+    </div>
+    @endif
+
     {{-- Tabel --}}
     <div class="overflow-x-auto rounded-xl border border-gray-200 shadow-sm bg-white">
       <table class="w-full table-auto text-sm text-gray-700">
@@ -65,10 +88,10 @@
         </thead>
         <tbody>
           @forelse($tugas as $t)
-            <tr class="text-center hover:bg-gray-50">
+            <tr id="tugas-{{ $t->id }}" class="text-center hover:bg-gray-50">
               <td class="p-3 border">{{ $loop->iteration }}</td>
               <td class="p-3 border">{{ $t->jenisPekerjaan->nama_pekerjaan }}</td>
-              <td class="p-3 border">{{ $t->pegawai->nama }}</td>
+              <td class="p-3 border">{{ $t->pegawai->user->name }}</td>
               <td class="p-3 border">{{ $t->target }} {{ $t->jenisPekerjaan->satuan ?? '' }}</td>
               <td class="p-3 border">{{ $t->asal ?? '-' }}</td>
               <td class="p-3 border">{{ \Carbon\Carbon::parse($t->deadline)->format('d M Y') }}</td>
@@ -194,8 +217,14 @@
                           $end = \Carbon\Carbon::parse($t->deadline);
                           $diff = $start->diffInDays($end);
                         @endphp
-                        <input type="number" id="edit_duration_{{ $t->id }}" value="{{ $diff }}" placeholder="Hari"
-                          class="w-full border rounded px-3 py-2 edit-duration-trigger" data-target="{{ $t->id }}" min="1">
+                        <input type="number"
+                                name="duration"
+                                id="edit_duration_{{ $t->id }}"
+                                value="{{ $diff }}"
+                                class="w-full border rounded px-3 py-2 edit-duration-trigger"
+                                data-target="{{ $t->id }}"
+                                min="1"
+                                required>
                       </div>
                     </div>
 
@@ -240,7 +269,7 @@
               <select name="pegawai_id" class="w-full border rounded px-3 py-2" required>
                 <option value="">-- Pilih Pegawai --</option>
                 @foreach($pegawai as $p)
-                  <option value="{{ $p->id }}">{{ $p->nama }} - {{ $p->jabatan }}</option>
+                  <option value="{{ $p->id }}">{{ $p->user->name }} - {{ $p->jabatan }}</option>
                 @endforeach
               </select>
             </div>
@@ -280,13 +309,18 @@
               </div>
               <div>
                 <label class="block mb-1 font-medium">Durasi (Hari)</label>
-                <input type="number" id="input_duration" placeholder="Contoh: 7" class="w-full border rounded px-3 py-2"
-                  min="1">
+                <input type="number"
+                  id="input_duration"
+                  name="duration"
+                  placeholder="Contoh: 7"
+                  class="w-full border rounded px-3 py-2"
+                  min="1"
+                  required>
               </div>
             </div>
             <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
               <label class="block text-sm font-semibold text-blue-700">Estimasi Deadline:</label>
-              <input type="date" id="input_deadline" name="deadline"
+              <input type="date" id="input_deadline"
                 class="bg-transparent border-none p-0 text-blue-800 font-bold focus:ring-0 w-full" readonly>
             </div>
 
@@ -304,6 +338,45 @@
         </form>
       </div>
     </div>
+
+<div x-show="openImport"
+x-cloak
+class="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
+
+<div class="bg-white rounded-xl p-6 w-96">
+
+<h2 class="text-lg font-semibold mb-4">Import Tugas</h2>
+
+<form action="{{ route('admin.pekerjaan.import') }}"
+method="POST"
+enctype="multipart/form-data">
+
+@csrf
+
+<input type="file" name="file"
+class="w-full border p-2 rounded mb-4"
+required>
+
+<div class="flex justify-end gap-2">
+
+<button type="button"
+@click="openImport=false"
+class="px-4 py-2 border rounded">
+Batal
+</button>
+
+<button type="submit"
+class="px-4 py-2 bg-blue-600 text-white rounded">
+Import
+</button>
+
+</div>
+
+</form>
+
+</div>
+</div>
+
   </div>
 
   <footer class="text-center text-sm text-gray-500 py-4 border-t mt-10">
@@ -390,6 +463,52 @@
           updateEditDeadline(id);
         });
       });
+
+      document.addEventListener("DOMContentLoaded", function () {
+
+    const startInput = document.getElementById("input_start_date");
+    const durationInput = document.getElementById("input_duration");
+    const deadlineInput = document.getElementById("input_deadline");
+
+document.addEventListener("DOMContentLoaded", function () {
+
+const startInput = document.getElementById("input_start_date");
+const durationInput = document.getElementById("input_duration");
+const deadlineInput = document.getElementById("input_deadline");
+
+function updateDeadline(){
+
+if(startInput.value && durationInput.value){
+
+let startDate = new Date(startInput.value);
+let duration = parseInt(durationInput.value);
+
+startDate.setDate(startDate.getDate() + duration);
+
+let yyyy = startDate.getFullYear();
+let mm = String(startDate.getMonth()+1).padStart(2,'0');
+let dd = String(startDate.getDate()).padStart(2,'0');
+
+deadlineInput.value = `${yyyy}-${mm}-${dd}`;
+}
+
+}
+
+startInput.addEventListener("change", updateDeadline);
+durationInput.addEventListener("input", updateDeadline);
+
+});
     });
+
   </script>
+
+    <script>
+  document.addEventListener("DOMContentLoaded", function() {
+      const el = document.getElementById("tugas-{{ session('scroll_to') }}");
+      if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+  });
+  </script>
+
 @endsection

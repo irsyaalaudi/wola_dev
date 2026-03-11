@@ -19,13 +19,14 @@ class InputTugasSheet implements FromArray, WithHeadings, WithTitle, WithEvents
             'pegawai_id',
             'jenis_pekerjaan_id',
             'target',
-            'deadline',
+            'start_date (format: yyyy-mm-dd)',
+            'durasi (contoh: 10)',
         ];
     }
 
     public function array(): array
     {
-        return array_fill(0, 100, ['', '', '', '']);
+        return array_fill(0, 100, ['', '', '', '', '']);
     }
 
     public function title(): string
@@ -69,29 +70,33 @@ class InputTugasSheet implements FromArray, WithHeadings, WithTitle, WithEvents
                 // =========================
                 // Format Deadline
                 // =========================
+                // Format start_date
                 $sheet->getStyle('D2:D200')
                     ->getNumberFormat()
                     ->setFormatCode(NumberFormat::FORMAT_DATE_YYYYMMDD2);
 
-                // Comment pada header deadline
-                $sheet->getComment('D1')
-                    ->getText()
-                    ->createTextRun("Format tanggal: \nyyyy-mm-dd\nContoh: 2026-01-01");
+                // Format deadline
+                // Format durasi (angka)
+                $sheet->getStyle('E2:E200')
+                    ->getNumberFormat()
+                    ->setFormatCode(NumberFormat::FORMAT_NUMBER);
 
 
                 // Validasi tanggal
                 for ($row = 2; $row <= 200; $row++) {
+                    $validationStart = $sheet->getCell("D$row")->getDataValidation();
+                    $validationStart->setType(DataValidation::TYPE_DATE);
+                    $validationStart->setOperator(DataValidation::OPERATOR_BETWEEN);
+                    $validationStart->setAllowBlank(true);
+                    $validationStart->setFormula1('DATE(2000,1,1)');
+                    $validationStart->setFormula2('DATE(2100,12,31)');
 
-                    $validation = $sheet->getCell("D$row")->getDataValidation();
-                    $validation->setType(DataValidation::TYPE_DATE);
-                    $validation->setOperator(DataValidation::OPERATOR_BETWEEN);
-                    $validation->setAllowBlank(true);
-                    $validation->setShowInputMessage(true);
-                    $validation->setShowErrorMessage(true);
-                    $validation->setErrorTitle('Tanggal Tidak Valid');
-                    $validation->setError('Gunakan format: 2026-01-01');
-                    $validation->setFormula1('DATE(2000,1,1)');
-                    $validation->setFormula2('DATE(2100,12,31)');
+                    // DEADLINE
+                    $validationDurasi = $sheet->getCell("E$row")->getDataValidation();
+                    $validationDurasi->setType(DataValidation::TYPE_WHOLE);
+                    $validationDurasi->setOperator(DataValidation::OPERATOR_GREATERTHAN);
+                    $validationDurasi->setFormula1('0');
+                    $validationDurasi->setAllowBlank(true);
                 }
 
                 // Freeze Header

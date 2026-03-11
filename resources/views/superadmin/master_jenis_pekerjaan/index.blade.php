@@ -32,6 +32,15 @@
             <i class="fas fa-file-excel mr-2"></i> Export Tabel
           </a>
 
+          <a href="{{ route('superadmin.jenis-pekerjaan.template') }}"
+            class="inline-flex items-center px-4 py-2 rounded-lg border border-blue-400 text-blue-600 font-medium
+            bg-blue-200/20 backdrop-blur-sm shadow-sm 
+            hover:bg-blue-300/30 hover:border-blue-500 hover:text-blue-700
+            transition duration-200 ease-in-out transform hover:scale-105">
+
+            <i class="fas fa-download mr-2"></i> Download Template
+          </a>
+
           <button @click="openImport = true" class="inline-flex items-center px-4 py-2 rounded-lg border border-purple-400 text-purple-600 font-medium
                                bg-purple-200/20 backdrop-blur-sm shadow-sm 
                                hover:bg-purple-300/30 hover:border-purple-500 hover:text-purple-700

@@ -82,12 +82,17 @@
             class="flex-grow md:flex-none text-center bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg px-6 py-2 transition duration-200 border border-gray-300">
             Reset
           </a>
+
+          <a href="{{ route('user.pekerjaan.export') }}"
+            class="bg-green-600 text-white px-4 py-2 rounded">
+            Export Excel
+          </a>
         </div>
       </div>
     </form>
 
     @forelse($tugas as $t)
-      <div class="border rounded-lg mb-4 overflow-hidden">
+      <div id="tugas-{{ $t->id }}" class="border rounded-lg mb-4 overflow-hidden">
         <div class="bg-blue-500 text-white px-4 py-3 flex justify-between items-center">
           <div class="flex items-center gap-2">
             <span class="font-bold text-white-900">

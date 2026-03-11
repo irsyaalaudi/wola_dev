@@ -10,6 +10,7 @@ use Carbon\Carbon;
 use Maatwebsite\Excel\Facades\Excel;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Style\Border;
+use App\Helpers\NilaiHelper;
 
 class ProgressController extends Controller
 {
@@ -42,65 +43,103 @@ class ProgressController extends Controller
                 }
             })
             ->get()
+    //         ->map(function ($t) use ($teamIds) {
+    //             $totalRealisasi = $t->semuaRealisasi->sum('realisasi');
+    //             $progress = $t->target > 0 ? min($totalRealisasi / $t->target, 1) : 0;
+
+    //             $bobot = $t->jenisPekerjaan->bobot ?? 0;
+
+    //             $realisasiSortir = $t->semuaRealisasi->sortBy('tanggal_realisasi');
+    //             $akumulasi = 0;
+    //             $tanggalCapai100 = null;
+    //             foreach ($realisasiSortir as $r) {
+    //                 $akumulasi += $r->realisasi;
+    //                 if ($akumulasi >= $t->target) {
+    //                     $tanggalCapai100 = $r->tanggal_realisasi;
+    //                     break;
+    //                 }
+    //             }
+
+    //             $hariTelat = 0;
+    //             if ($tanggalCapai100) {
+    //                 if (Carbon::parse($tanggalCapai100)->gt(Carbon::parse($t->deadline))) {
+    //                     $hariTelat = Carbon::parse($t->deadline)
+    //                         ->diffInDays(Carbon::parse($tanggalCapai100));
+    //                 }
+    //             } else {
+    //                 if (Carbon::now()->gt(Carbon::parse($t->deadline))) {
+    //                     $hariTelat = Carbon::parse($t->deadline)->diffInDays(Carbon::now());
+    //                 }
+    //             }
+    //             $penalti = $bobot * 0.1 * $hariTelat;
+    //             $nilaiAkhir = max(0, ($bobot * $progress) - $penalti);
+
+    //             $namaTim = $t->jenisPekerjaan->teams
+    //                 ->whereIn('id', $teamIds)
+    //                 ->pluck('nama_tim')
+    //                 ->implode(', ') ?: '-';
+    //             $realisasiTerakhir = $t->semuaRealisasi->last();
+
+    //             return [
+    //                 'id' => $t->id,
+    //                 'pegawai' => $t->pegawai->user->name ?? '-',
+    //                 'tim' => $namaTim,
+    //                 'nama_tugas' => $t->jenisPekerjaan->nama_pekerjaan ?? '-',
+    //                 'target' => $t->target,
+    //                 'satuan' => $t->jenisPekerjaan->satuan ?? '-',
+    //                 'totalRealisasi' => $totalRealisasi,
+    //                 'realisasiTerakhir' => $realisasiTerakhir->realisasi ?? null,
+    //                 'histori' => $t->semuaRealisasi,
+    //                 'bobot' => $bobot,
+    //                 'hariTelat' => $hariTelat,
+    //                 'nilaiAkhir' => round($nilaiAkhir, 2),
+    //                 'status' => $t->status,
+    //                 'isApproved' => $realisasiTerakhir?->is_approved ?? false,
+    //                 'asal' => $t->asal,
+    //                 'file_bukti' => $realisasiTerakhir?->file_bukti ?? null,
+    //             ];
+    //         });
             ->map(function ($t) use ($teamIds) {
-                $totalRealisasi = $t->semuaRealisasi->sum('realisasi');
-                $progress = $t->target > 0 ? min($totalRealisasi / $t->target, 1) : 0;
 
-                $bobot = $t->jenisPekerjaan->bobot ?? 0;
+        $nilai = NilaiHelper::hitung($t);
 
-                $realisasiSortir = $t->semuaRealisasi->sortBy('tanggal_realisasi');
-                $akumulasi = 0;
-                $tanggalCapai100 = null;
-                foreach ($realisasiSortir as $r) {
-                    $akumulasi += $r->realisasi;
-                    if ($akumulasi >= $t->target) {
-                        $tanggalCapai100 = $r->tanggal_realisasi;
-                        break;
-                    }
-                }
+        $totalRealisasi = $nilai['totalRealisasi'];
+        $progress = $nilai['progress'];
+        $hariTelat = $nilai['hariTelat'];
+        $bobot = $nilai['bobot'];
+        $nilaiAkhir = $nilai['nilaiAkhir'];
 
-                $hariTelat = 0;
-                if ($tanggalCapai100) {
-                    if (Carbon::parse($tanggalCapai100)->gt(Carbon::parse($t->deadline))) {
-                        $hariTelat = Carbon::parse($t->deadline)
-                            ->diffInDays(Carbon::parse($tanggalCapai100));
-                    }
-                } else {
-                    if (Carbon::now()->gt(Carbon::parse($t->deadline))) {
-                        $hariTelat = Carbon::parse($t->deadline)->diffInDays(Carbon::now());
-                    }
-                }
-                $penalti = $bobot * 0.1 * $hariTelat;
-                $nilaiAkhir = max(0, ($bobot * $progress) - $penalti);
+        $namaTim = $t->jenisPekerjaan->teams
+            ->whereIn('id', $teamIds)
+            ->pluck('nama_tim')
+            ->implode(', ') ?: '-';
 
-                $namaTim = $t->jenisPekerjaan->teams
-                    ->whereIn('id', $teamIds)
-                    ->pluck('nama_tim')
-                    ->implode(', ') ?: '-';
-                $realisasiTerakhir = $t->semuaRealisasi->last();
+        $realisasiTerakhir = $t->semuaRealisasi->last();
 
-                return [
-                    'id' => $t->id,
-                    'pegawai' => $t->pegawai->user->name ?? '-',
-                    'tim' => $namaTim,
-                    'nama_tugas' => $t->jenisPekerjaan->nama_pekerjaan ?? '-',
-                    'target' => $t->target,
-                    'satuan' => $t->jenisPekerjaan->satuan ?? '-',
-                    'totalRealisasi' => $totalRealisasi,
-                    'realisasiTerakhir' => $realisasiTerakhir->realisasi ?? null,
-                    'histori' => $t->semuaRealisasi,
-                    'bobot' => $bobot,
-                    'hariTelat' => $hariTelat,
-                    'nilaiAkhir' => round($nilaiAkhir, 2),
-                    'status' => $t->status,
-                    'isApproved' => $realisasiTerakhir?->is_approved ?? false,
-                    'asal' => $t->asal,
-                    'file_bukti' => $realisasiTerakhir?->file_bukti ?? null,
-                ];
-            });
+        return [
+            'id' => $t->id,
+            'pegawai' => $t->pegawai->user->name ?? '-',
+            'tim' => $namaTim,
+            'nama_tugas' => $t->jenisPekerjaan->nama_pekerjaan ?? '-',
+            'target' => $t->target,
+            'satuan' => $t->jenisPekerjaan->satuan ?? '-',
+            'totalRealisasi' => $totalRealisasi,
+            'progress' => round($progress * 100, 2),
+            'realisasiTerakhir' => $realisasiTerakhir->realisasi ?? null,
+            'histori' => $t->semuaRealisasi,
+            'bobot' => $bobot,
+            'hariTelat' => $hariTelat,
+            'nilaiAkhir' => $nilaiAkhir,
+            'status' => $t->status,
+            'isApproved' => $realisasiTerakhir?->is_approved ?? false,
+            'asal' => $t->asal,
+            'file_bukti' => $realisasiTerakhir?->file_bukti ?? null,
+        ];
+    });
 
         return view('admin.progress.index', compact('tugas'));
     }
+    
 
     /**
      * Approve realisasi terakhir dari tugas
@@ -168,39 +207,17 @@ class ProgressController extends Controller
                     })
                     ->get()
                     ->map(function ($t, $index) {
-                        $totalRealisasi = $t->semuaRealisasi->sum('realisasi');
-                        $progress = $t->target > 0 ? min($totalRealisasi / $t->target, 1) : 0;
 
-                        $bobot = $t->jenisPekerjaan->bobot ?? 0;
+                            $nilai = NilaiHelper::hitung($t);
 
-                        // keterlambatan
-                        $realisasiSortir = $t->semuaRealisasi->sortBy('tanggal_realisasi');
-                        $akumulasi = 0;
-                        $tanggalCapai100 = null;
-                        foreach ($realisasiSortir as $r) {
-                            $akumulasi += $r->realisasi;
-                            if ($akumulasi >= $t->target) {
-                                $tanggalCapai100 = $r->tanggal_realisasi;
-                                break;
-                            }
-                        }
-
-                        $hariTelat = 0;
-                        if ($tanggalCapai100) {
-                            if (Carbon::parse($tanggalCapai100)->gt(Carbon::parse($t->deadline))) {
-                                $hariTelat = Carbon::parse($t->deadline)
-                                    ->diffInDays(Carbon::parse($tanggalCapai100));
-                            }
-                        } else {
-                            if (Carbon::now()->gt(Carbon::parse($t->deadline))) {
-                                $hariTelat = Carbon::parse($t->deadline)->diffInDays(Carbon::now());
-                            }
-                        }
-                        $penalti = $bobot * 0.1 * $hariTelat;
-                        $nilaiAkhir = max(0, ($bobot * $progress) - $penalti);
+                            $totalRealisasi = $nilai['totalRealisasi'];
+                            $progress = $nilai['progress'];
+                            $hariTelat = $nilai['hariTelat'];
+                            $bobot = $nilai['bobot'];
+                            $nilaiAkhir = $nilai['nilaiAkhir'];
 
                         $namaTim = $t->jenisPekerjaan->teams
-                            ->whereIn('id', values: $this->teamIds)
+                            ->whereIn('id', $this->teamIds)
                             ->pluck('nama_tim')
                             ->implode(', ') ?: '-';
 
@@ -214,6 +231,8 @@ class ProgressController extends Controller
                             'Nama Tugas' => $t->jenisPekerjaan->nama_pekerjaan ?? '-',
                             'Target' => $t->target,
                             'Realisasi' => $totalRealisasi,
+                            'Progress (%)' => round($progress * 100, 2),
+                            //'progress' => $progress,
                             'Bobot' => $bobot,
                             'Hari Telat' => $hariTelat,
                             'Nilai Akhir' => round($nilaiAkhir, 2),
@@ -233,6 +252,7 @@ class ProgressController extends Controller
                 'Nama Tugas',
                 'Target',
                 'Realisasi',
+                'Progress (%)',
                 'Bobot',
                 'Hari Telat',
                 'Nilai Akhir',

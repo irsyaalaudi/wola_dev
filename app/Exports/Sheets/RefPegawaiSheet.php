@@ -11,14 +11,16 @@ class RefPegawaiSheet implements FromCollection, WithHeadings, WithTitle
 {
     public function collection()
     {
-        return Pegawai::select('id','nama','jabatan')
+        return Pegawai::with('user')
             ->get()
             ->map(function ($p) {
+                $nama = $p->user->name ?? '-';
+
                 return [
                     'id' => $p->id,
-                    'nama' => $p->nama,
+                    'nama' => $nama,
                     'jabatan' => $p->jabatan,
-                    'display' => $p->id . ' - ' . $p->nama
+                    'display' => $p->id . ' - ' . $nama
                 ];
             });
     }

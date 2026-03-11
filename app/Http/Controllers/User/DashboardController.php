@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Tugas;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
+use App\Helpers\NilaiHelper;
 
 class DashboardController extends Controller
 {
@@ -84,8 +85,10 @@ class DashboardController extends Controller
             }
 
             // Penalti & nilai akhir
-            $penalti = $bobot * 0.5 * $hariTelat;
-            $nilaiAkhir = max(0, ($bobot * $progress) - $penalti);
+            $nilai = NilaiHelper::hitung($t);
+
+            $hariTelat = $nilai['hariTelat'];
+            $nilaiAkhir = $nilai['nilaiAkhir'];
 
             // Status tugas
             $status = $t->status ?? 'pending';

@@ -16,6 +16,7 @@ use PhpOffice\PhpSpreadsheet\Style\Border;
 use Carbon\Carbon;
 use App\Exports\TemplateTugasExport;
 use App\Imports\TugasImport;
+use PhpOffice\PhpSpreadsheet\Shared\Date;
 
 class PekerjaanController extends Controller
 {
@@ -29,7 +30,7 @@ class PekerjaanController extends Controller
         $teamIds = $teams->pluck('id');
 
         $tugas = Tugas::with(['pegawai', 'jenisPekerjaan', 'realisasi'])
-            ->where('asal', $user->name)
+            //->where('asal', $user->name)
             ->whereHas('jenisPekerjaan.teams', fn($q) => $q->whereIn('teams.id', $teamIds))
             ->when($search, fn($query) => $query->where(function ($q) use ($search) {
                 $q->orWhereHas('pegawai', fn($q2) => $q2->whereHas('user', fn($u) => $u->where('name', 'like', "%{$search}%"))
@@ -38,7 +39,7 @@ class PekerjaanController extends Controller
             }))
             ->get();
 
-        $pegawaiList = Pegawai::all();
+        $pegawaiList = Pegawai::with('user')->get();
 
         $jenisPekerjaanModal = JenisPekerjaan::whereHas('teams', function ($q) use ($pegawai) {
             $q->whereHas('pegawais', function ($q2) use ($pegawai) {
@@ -54,82 +55,160 @@ class PekerjaanController extends Controller
         ]);
     }
 
+    // public function store(Request $request)
+    // {
+    //     $request->validate([
+    //         'pegawai_id' => 'required|exists:pegawais,id',
+    //         'jenis_pekerjaan_id' => 'required|exists:jenis_pekerjaans,id',
+    //         'target' => 'required|numeric',
+    //         'start_date' => 'required|date',
+    //         'deadline' => 'required|date',
+    //     ]);
+
+    //    // $pegawai = auth()->user()->pegawai;
+    //     $pemberi = auth()->user()->name ?? 'Tidak diketahui';
+    //     // $teamIds = $pegawai?->teams->pluck('id') ?? collect();
+    //     // $validJenis = JenisPekerjaan::whereHas('teams', fn($q) => $q->whereIn('teams.id', $teamIds))
+    //     //               ->pluck('id')->toArray();
+
+    //     // if (!in_array($request->jenis_pekerjaan_id, $validJenis)) {
+    //     //     return back()->withErrors(['jenis_pekerjaan_id' => 'Jenis pekerjaan tidak valid untuk tim Anda.']);
+    //     // }
+    //     $jenis = JenisPekerjaan::find($request->jenis_pekerjaan_id);
+
+    //     if (!$jenis) {
+    //         return back()->withErrors([
+    //             'jenis_pekerjaan_id' => 'Jenis pekerjaan tidak ditemukan.'
+    //         ]);
+    //     }
+
+    //     Tugas::create([
+    //         'pegawai_id' => $request->pegawai_id,
+    //         'jenis_pekerjaan_id' => $request->jenis_pekerjaan_id,
+    //         'target' => $request->target,
+    //         'asal' => $pemberi,
+    //         'start_date' => $request->start_date,
+    //         'deadline' => $request->deadline,
+    //         'status' => 'pending',
+    //     ]);
+
+    //     return redirect()->route('admin.pekerjaan.index')->with('success', 'Tugas berhasil ditambahkan.');
+    // }
     public function store(Request $request)
-    {
-        $request->validate([
-            'pegawai_id' => 'required|exists:pegawais,id',
-            'jenis_pekerjaan_id' => 'required|exists:jenis_pekerjaans,id',
-            'target' => 'required|numeric',
-            'start_date' => 'required|date',
-            'deadline' => 'required|date',
-        ]);
+{
+    $request->validate([
+        'pegawai_id' => 'required|exists:pegawais,id',
+        'jenis_pekerjaan_id' => 'required|exists:jenis_pekerjaans,id',
+        'target' => 'required|numeric',
+        'start_date' => 'required|date',
+        'duration' => 'required|numeric|min:1'
+    ]);
 
-        $pegawai = auth()->user()->pegawai;
-        $pemberi = auth()->user()->name ?? 'Tidak diketahui';
-        $teamIds = $pegawai?->teams->pluck('id') ?? collect();
-        $validJenis = JenisPekerjaan::whereHas('teams', fn($q) => $q->whereIn('teams.id', $teamIds))
-                      ->pluck('id')->toArray();
+    $pemberi = auth()->user()->name;
 
-        if (!in_array($request->jenis_pekerjaan_id, $validJenis)) {
-            return back()->withErrors(['jenis_pekerjaan_id' => 'Jenis pekerjaan tidak valid untuk tim Anda.']);
-        }
+    $startDate = Carbon::parse($request->start_date);
 
-        Tugas::create([
-            'pegawai_id' => $request->pegawai_id,
-            'jenis_pekerjaan_id' => $request->jenis_pekerjaan_id,
-            'target' => $request->target,
-            'asal' => $pemberi,
-            'start_date' => $request->start_date,
-            'deadline' => $request->deadline,
-            'status' => 'pending',
-        ]);
+    //$deadline = $startDate->copy()->addDays($request->duration);
+    $duration = (int) $request->duration;
 
-        return redirect()->route('admin.pekerjaan.index')->with('success', 'Tugas berhasil ditambahkan.');
-    }
+    $deadline = $startDate->copy()->addDays($duration);
+    Tugas::create([
+        'pegawai_id' => $request->pegawai_id,
+        'jenis_pekerjaan_id' => $request->jenis_pekerjaan_id,
+        'target' => $request->target,
+        'asal' => $pemberi,
+        'start_date' => $startDate,
+        'deadline' => $deadline,
+        'status' => 'pending',
+    ]);
 
+    return redirect()->route('admin.pekerjaan.index')
+    ->with('success','Tugas berhasil ditambahkan');
+}
+
+    // public function update(Request $request, $id)
+    // {
+    //     $tugas = Tugas::with('realisasi')->findOrFail($id);
+
+    //     // Cek apakah sudah dikerjakan
+    //     if (in_array($tugas->status, ['waiting_approval', 'done'])) {
+    //         return redirect()->route('admin.pekerjaan.index')
+    //             ->with('error', 'Tugas sudah dikerjakan dan tidak bisa diedit.');
+    //     }
+
+    //     $request->validate([
+    //         'pegawai_id' => 'required|exists:pegawais,id',
+    //         'jenis_pekerjaan_id' => 'required|exists:jenis_pekerjaans,id',
+    //         'target' => 'required|numeric',
+    //         'start_date' => 'required|date',
+    //         'deadline' => 'required|date',
+    //     ]);
+
+    //     $pegawai = auth()->user()->pegawai;
+    //     $teams = $pegawai?->teams ?? collect();
+    //     $teamIds = $teams->pluck('id');
+
+    //     $validJenis = JenisPekerjaan::whereHas('teams', fn($q) => $q->whereIn('teams.id', $teamIds))
+    //                   ->pluck('id')->toArray();
+
+    //     if (!in_array($request->jenis_pekerjaan_id, $validJenis)) {
+    //         return back()->withErrors(['jenis_pekerjaan_id' => 'Jenis pekerjaan tidak valid untuk tim Anda.']);
+    //     }
+
+    //     $pemberi = auth()->user()->name ?? 'Tidak diketahui';
+
+    //     $tugas->update([
+    //         'pegawai_id' => $request->pegawai_id,
+    //         'jenis_pekerjaan_id' => $request->jenis_pekerjaan_id,
+    //         'target' => $request->target,
+    //         'asal' => $pemberi,
+    //         'start_date' => $request->start_date,
+    //         'deadline' => $request->deadline,
+    //         'status' => 'pending',
+    //     ]);
+
+    //     return redirect()
+    // ->route('admin.pekerjaan.index')
+    // ->with('success','Tugas berhasil diupdate')
+    // ->with('scroll_to', $tugas->id);
+    // }
     public function update(Request $request, $id)
-    {
-        $tugas = Tugas::with('realisasi')->findOrFail($id);
+{
+    $tugas = Tugas::findOrFail($id);
 
-        // Cek apakah sudah dikerjakan
-        if (in_array($tugas->status, ['waiting_approval', 'done'])) {
-            return redirect()->route('admin.pekerjaan.index')
-                ->with('error', 'Tugas sudah dikerjakan dan tidak bisa diedit.');
-        }
-
-        $request->validate([
-            'pegawai_id' => 'required|exists:pegawais,id',
-            'jenis_pekerjaan_id' => 'required|exists:jenis_pekerjaans,id',
-            'target' => 'required|numeric',
-            'start_date' => 'required|date',
-            'deadline' => 'required|date',
-        ]);
-
-        $pegawai = auth()->user()->pegawai;
-        $teams = $pegawai?->teams ?? collect();
-        $teamIds = $teams->pluck('id');
-
-        $validJenis = JenisPekerjaan::whereHas('teams', fn($q) => $q->whereIn('teams.id', $teamIds))
-                      ->pluck('id')->toArray();
-
-        if (!in_array($request->jenis_pekerjaan_id, $validJenis)) {
-            return back()->withErrors(['jenis_pekerjaan_id' => 'Jenis pekerjaan tidak valid untuk tim Anda.']);
-        }
-
-        $pemberi = auth()->user()->name ?? 'Tidak diketahui';
-
-        $tugas->update([
-            'pegawai_id' => $request->pegawai_id,
-            'jenis_pekerjaan_id' => $request->jenis_pekerjaan_id,
-            'target' => $request->target,
-            'asal' => $pemberi,
-            'start_date' => $request->start_date,
-            'deadline' => $request->deadline,
-            'status' => 'pending',
-        ]);
-
-        return redirect()->route('admin.pekerjaan.index')->with('success', 'Tugas berhasil diperbarui.');
+    if (in_array($tugas->status, ['waiting_approval','done'])) {
+        return redirect()->route('admin.pekerjaan.index')
+        ->with('error','Tugas sudah dikerjakan dan tidak bisa diedit.');
     }
+
+    $request->validate([
+        'pegawai_id' => 'required|exists:pegawais,id',
+        'jenis_pekerjaan_id' => 'required|exists:jenis_pekerjaans,id',
+        'target' => 'required|numeric',
+        'start_date' => 'required|date',
+        'duration' => 'required|integer|min:1'
+    ]);
+
+    $startDate = Carbon::parse($request->start_date);
+
+    $duration = (int) $request->duration;
+
+    $deadline = $startDate->copy()->addDays($duration);
+
+    $tugas->update([
+        'pegawai_id' => $request->pegawai_id,
+        'jenis_pekerjaan_id' => $request->jenis_pekerjaan_id,
+        'target' => $request->target,
+        'asal' => auth()->user()->name,
+        'start_date' => $startDate,
+        'deadline' => $deadline,
+        'status' => 'pending',
+    ]);
+
+    return redirect()->route('admin.pekerjaan.index')
+    ->with('success','Tugas berhasil diupdate')
+    ->with('scroll_to',$tugas->id);
+}
 
     public function destroy($id)
     {
@@ -254,7 +333,7 @@ public function import(Request $request)
             'file' => 'required|mimes:xlsx,xls,csv|max:5120'
         ]);
 
-        $teamIds = auth()->user()->pegawai?->teams->pluck('id') ?? [];
+        $teamIds = auth()->user()->pegawai->teams->pluck('id') ?? [];
 
         Excel::import(
             new class ($teamIds) implements \Maatwebsite\Excel\Concerns\ToModel, \Maatwebsite\Excel\Concerns\WithHeadingRow {
@@ -266,26 +345,35 @@ public function import(Request $request)
 
             public function model(array $row)
             {
+                $startDate = null;
                 $deadline = null;
-                if (!empty($row['deadline'])) {
-                    try {
-                        $deadline = Carbon::createFromFormat('d-m-Y', $row['deadline'])->format('Y-m-d');
-                    } catch (\Exception $e) {
-                        try {
-                            $deadline = Carbon::parse($row['deadline'])->format('Y-m-d');
-                        } catch (\Exception $e) {
-                            $deadline = null;
-                        }
+
+                if (!empty($row['start_date_format_yyyy_mm_dd'])) {
+
+                    if (is_numeric($row['start_date_format_yyyy_mm_dd'])) {
+                        $startDate = Carbon::instance(
+                            Date::excelToDateTimeObject($row['start_date_format_yyyy_mm_dd'])
+                        );
+                    } else {
+                        $startDate = Carbon::parse($row['start_date_format_yyyy_mm_dd']);
                     }
                 }
 
-                $pegawaiId = Pegawai::whereHas('user', fn($q) => $q->where('name', $row['pegawai']))
-                    ->whereHas('teams', fn($q) => $q->whereIn('teams.id', $this->teamIds))
-                    ->value('id');
+                $durasi = $row['durasi_contoh_10'] ?? 0;
 
-                $jenisId = JenisPekerjaan::where('nama_pekerjaan', $row['jenis_pekerjaan'])
-                        ->whereHas('teams', fn($q) => $q->whereIn('teams.id', $this->teamIds))
-                        ->value('id');
+                if ($startDate && $durasi) {
+                    $deadline = $startDate->copy()->addDays($durasi);
+                }
+                $pegawaiId = null;
+                $jenisId = null;
+
+                if (!empty($row['pegawai_id'])) {
+                    $pegawaiId = explode(' - ', $row['pegawai_id'])[0];
+                }
+
+                if (!empty($row['jenis_pekerjaan_id'])) {
+                    $jenisId = explode(' - ', $row['jenis_pekerjaan_id'])[0];
+                }
 
                 if (!$pegawaiId || !$jenisId)
                     return null;
@@ -294,8 +382,8 @@ public function import(Request $request)
                     'pegawai_id' => $pegawaiId,
                     'jenis_pekerjaan_id' => $jenisId,
                     'target' => $row['target'] ?? 0,
-                    'asal' => $row['pemberi_pekerjaan'] ?? '-',
-                    'start_date' => $row['start_date'] ?? null,
+                    'asal' => auth()->user()->name,
+                    'start_date' => $startDate,
                     'deadline' => $deadline,
                     'status' => 'pending',
                 ]);

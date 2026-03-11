@@ -17,25 +17,27 @@ class RefJenisSheet implements FromCollection, WithHeadings, WithTitle
     }
 
     public function collection()
-{
-    $pegawai = $this->user->pegawai;
+    {
+        $pegawai = $this->user->pegawai;
 
-    return JenisPekerjaan::with('team')
-        ->whereHas('team.pegawais', function ($q) use ($pegawai) {
-            $q->where('pegawai_team.is_leader', 1)
-              ->where('pegawai_team.pegawai_id', $pegawai->id);
-        })
-        ->get()
-        ->map(function ($j) {
-            return [
-                'id' => $j->id,
-                'nama_pekerjaan' => $j->nama_pekerjaan,
-                'tim' => $j->team->nama_tim ?? '-',
-                'satuan' => $j->satuan,
-                'display' => $j->id . ' - ' . $j->nama_pekerjaan
-            ];
-        });
-}
+        return JenisPekerjaan::with('teams')
+            ->whereHas('teams.pegawais', function ($q) use ($pegawai) {
+                $q->where('pegawai_team.is_leader', 1)
+                ->where('pegawai_team.pegawai_id', $pegawai->id);
+            })
+            ->get()
+            ->map(function ($j) {
+
+                return [
+                    'id' => $j->id,
+                    'nama_pekerjaan' => $j->nama_pekerjaan,
+                    'tim' => $j->teams->pluck('nama_tim')->implode(', ') ?: '-',
+                    'satuan' => $j->satuan,
+                    'display' => $j->id . ' - ' . $j->nama_pekerjaan
+                ];
+
+            });
+    }
 
     public function headings(): array
     {

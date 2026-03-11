@@ -130,6 +130,17 @@ Route::prefix('superadmin')->name('superadmin.')->middleware(['auth', 'role:supe
 Route::get('/user/pekerjaan/export', [UserPekerjaanController::class, 'export'])
     ->name('user.pekerjaan.export');
 
+Route::get('/user/pekerjaan/export', 
+[App\Http\Controllers\User\PekerjaanController::class, 'export'])
+->name('user.pekerjaan.export');
+
+Route::get('/jenis-pekerjaan/template', 
+    [JenisPekerjaanController::class,'downloadTemplate']
+)->name('superadmin.jenis-pekerjaan.template');
+
+Route::post('/jenis-pekerjaan/import',
+    [JenisPekerjaanController::class,'import']
+)->name('superadmin.jenis-pekerjaan.import');
 // =========================
 // USER PANEL ROUTES
 // =========================

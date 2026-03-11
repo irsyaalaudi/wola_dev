@@ -7,6 +7,8 @@ use Illuminate\Http\Request;
 use App\Models\Pegawai;
 use App\Models\Team;
 use App\Models\Tugas;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use App\Helpers\NilaiHelper;
 
 class DashboardController extends Controller
 {
@@ -76,9 +78,16 @@ class DashboardController extends Controller
         $allTugas = (clone $tugasQuery)->with('semuaRealisasi')->get();
         $nilaiKeseluruhan = 0;
         if ($allTugas->count() > 0) {
+            // $persenList = $allTugas->map(function ($t) {
+            //     $totalRealisasi = $t->semuaRealisasi->sum('realisasi');
+            //     return $t->target > 0 ? min($totalRealisasi / $t->target, 1) * 100 : 0;
+            // });
             $persenList = $allTugas->map(function ($t) {
-                $totalRealisasi = $t->semuaRealisasi->sum('realisasi');
-                return $t->target > 0 ? min($totalRealisasi / $t->target, 1) * 100 : 0;
+
+                $hasil = \App\Helpers\NilaiHelper::hitung($t);
+
+                return $hasil['progress'] * 100;
+
             });
             $nilaiKeseluruhan = round($persenList->avg(), 2);
         }
@@ -355,8 +364,11 @@ $tasks = $tasks->get();
 
                         // Autosize semua kolom
                         $highestColumn = $sheet->getHighestColumn();
-                        foreach (range('A', $highestColumn) as $col) {
-                            $sheet->getColumnDimension($col)->setAutoSize(true);
+                        $highestColumnIndex = Coordinate::columnIndexFromString($highestColumn);
+
+                        for ($col = 1; $col <= $highestColumnIndex; $col++) {
+                            $colLetter = Coordinate::stringFromColumnIndex($col);
+                            $sheet->getColumnDimension($colLetter)->setAutoSize(true);
                         }
                     },
                 ];
