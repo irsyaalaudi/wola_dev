@@ -43,9 +43,11 @@ class DashboardController extends Controller
             12 => 'Desember'
         ];
 
+        $year = $tahun ?? now()->year;
+
         $labelBulanTahun = match (true) {
             $bulan && $tahun   => strtoupper($namaBulan[(int)$bulan]) . " $tahun",
-            $bulan && !$tahun  => strtoupper($namaBulan[(int)$bulan]) . " - Semua Tahun",
+            $bulan && !$tahun  => strtoupper($namaBulan[(int)$bulan]) . " $year",
             !$bulan && $tahun  => "Semua Bulan - $tahun",
             default            => 'Semua Bulan & Tahun'
         };
@@ -57,8 +59,27 @@ class DashboardController extends Controller
         $tasksQuery = Tugas::with(['pegawai.teams', 'jenisPekerjaan.teams', 'semuaRealisasi'])
             ->whereIn('pegawai_id', $memberIds)
             ->where('asal', auth()->user()->name)
-            ->when($bulan, fn($q) => $q->whereMonth('created_at', $bulan))
-            ->when($tahun, fn($q) => $q->whereYear('created_at', $tahun));
+            // ->when($bulan, fn($q) => $q->whereMonth('created_at', $bulan))
+            // ->when($tahun, fn($q) => $q->whereYear('created_at', $tahun));
+            ->when($bulan || $tahun, function ($q) use ($bulan, $tahun) {
+
+                // jika tahun kosong, pakai tahun sekarang
+                $year = $tahun ?? now()->year;
+
+                // jika bulan kosong berarti seluruh tahun
+                if ($bulan) {
+                    $startDate = Carbon::create($year, $bulan, 1)->startOfMonth();
+                    $endDate   = Carbon::create($year, $bulan, 1)->endOfMonth();
+                } else {
+                    $startDate = Carbon::create($year, 1, 1)->startOfYear();
+                    $endDate   = Carbon::create($year, 12, 31)->endOfYear();
+                }
+
+                $q->where(function ($query) use ($startDate, $endDate) {
+                    $query->whereDate('start_date', '<=', $endDate)
+                        ->whereDate('deadline', '>=', $startDate);
+                });
+            });
 
         // Filter search
         if ($search !== '') {
@@ -71,7 +92,7 @@ class DashboardController extends Controller
             });
         }
 
-        
+
         $tasks = $tasksQuery->get();
 
         // Transform tugas
@@ -79,43 +100,47 @@ class DashboardController extends Controller
 
         $pegawaiSummary = $tasks->groupBy('pegawai_id')->map(function ($items) {
 
-    return [
-        'nama' => $items->first()->pegawai->nama ?? '-',
-
-        'target' => $items->sum('totalTarget'),
-
-        'realisasi' => $items->sum('totalRealisasi'),
-
-        // daftar tugas
-        'tugas' => $items->map(function ($task) {
-            return $task->jenisPekerjaan->nama_pekerjaan ?? '-';
-        })->values()->toArray(),
-
-        // detail realisasi
-        'realisasi_detail' => $items->map(function ($task) {
             return [
-                'nama' => $task->jenisPekerjaan->nama_pekerjaan ?? '-',
-                'realisasi' => $task->semuaRealisasi->sum('realisasi')
+                'nama' => $items->first()->pegawai->nama ?? '-',
+
+                'target' => $items->sum('totalTarget'),
+
+                'realisasi' => $items->sum('totalRealisasi'),
+
+                // daftar tugas
+                'tugas' => $items->map(function ($task) {
+                    return $task->jenisPekerjaan->nama_pekerjaan ?? '-';
+                })->values()->toArray(),
+
+                // detail realisasi
+                'realisasi_detail' => $items->map(function ($task) {
+                    return [
+                        'nama' => $task->jenisPekerjaan->nama_pekerjaan ?? '-',
+                        'realisasi' => $task->semuaRealisasi->sum('realisasi')
+                    ];
+                })->values()->toArray()
             ];
-        })->values()->toArray()
-    ];
-});
+        });
 
         $totalTugas = $tasks->count();
 
-        $tugasSelesai = $tasks->filter(fn($t) =>
+        $tugasSelesai = $tasks->filter(
+            fn($t) =>
             $t->totalRealisasi >= $t->totalTarget
         )->count();
 
-        $tugasOngoing = $tasks->filter(fn($t) =>
+        $tugasOngoing = $tasks->filter(
+            fn($t) =>
             $t->totalRealisasi > 0 && $t->totalRealisasi < $t->totalTarget
         )->count();
 
-        $tugasBelum = $tasks->filter(fn($t) =>
+        $tugasBelum = $tasks->filter(
+            fn($t) =>
             $t->totalRealisasi == 0
         )->count();
 
-        $tugasWaitingApproval = $tasks->filter(fn($t) =>
+        $tugasWaitingApproval = $tasks->filter(
+            fn($t) =>
             $t->semuaRealisasi->where('is_approved', false)->count() > 0
         )->count();
         $rataNilaiAkhir  = $totalTugas > 0 ? round($tasks->avg('nilaiAkhir'), 2) : 0;
@@ -137,9 +162,7 @@ class DashboardController extends Controller
                     'pegawai' => $t->pegawai->nama ?? '-',
                     'realisasi' => $r->realisasi
                 ];
-
             })->values()->toArray();
-
         })->values()->toArray();
 
         return view('admin.dashboard', compact(
@@ -161,7 +184,7 @@ class DashboardController extends Controller
             'grafikPegawaiRealisasi',
             'grafikPegawaiTugas',
             'grafikPegawaiRealisasiDetail',
-            
+
             'labelBulanTahun'
         ));
     }
@@ -186,9 +209,25 @@ class DashboardController extends Controller
             ->whereIn('pegawai_id', $memberIds)
             ->where('asal', auth()->user()->name);
 
-        if ($bulan) $tasks->whereMonth('created_at', $bulan);
-        if ($tahun) $tasks->whereYear('created_at', $tahun);
+        // if ($bulan) $tasks->whereMonth('created_at', $bulan);
+        // if ($tahun) $tasks->whereYear('created_at', $tahun);
+        if ($bulan || $tahun) {
 
+            $year = $tahun ?? now()->year;
+
+            if ($bulan) {
+                $startDate = Carbon::create($year, $bulan, 1)->startOfMonth();
+                $endDate   = Carbon::create($year, $bulan, 1)->endOfMonth();
+            } else {
+                $startDate = Carbon::create($year, 1, 1)->startOfYear();
+                $endDate   = Carbon::create($year, 12, 31)->endOfYear();
+            }
+
+            $tasks->where(function ($query) use ($startDate, $endDate) {
+                $query->whereDate('start_date', '<=', $endDate)
+                    ->whereDate('deadline', '>=', $startDate);
+            });
+        }
         if ($search !== '') {
             $keywords = preg_split('/[\s,]+/', $search, -1, PREG_SPLIT_NO_EMPTY);
             $tasks->where(function ($q) use ($keywords) {
@@ -376,21 +415,21 @@ class DashboardController extends Controller
     //     return $t;
     // }
     private function calculateTask($t)
-{
-    $hasil = \App\Helpers\NilaiHelper::hitung($t);
+    {
+        $hasil = \App\Helpers\NilaiHelper::hitung($t);
 
-    $t->namaTim = $t->jenisPekerjaan->teams->first()->nama_tim ?? '-';
+        $t->namaTim = $t->jenisPekerjaan->teams->first()->nama_tim ?? '-';
 
-    $t->bobot = $hasil['bobot'];
+        $t->bobot = $hasil['bobot'];
 
-    $t->hariTelat = $hasil['hariTelat'];
+        $t->hariTelat = $hasil['hariTelat'];
 
-    $t->nilaiAkhir = $hasil['nilaiAkhir'];
+        $t->nilaiAkhir = $hasil['nilaiAkhir'];
 
-    $t->totalTarget = $t->target ?? 0;
+        $t->totalTarget = $t->target ?? 0;
 
-    $t->totalRealisasi = $hasil['totalRealisasi'];
+        $t->totalRealisasi = $hasil['totalRealisasi'];
 
-    return $t;
-}
+        return $t;
+    }
 }

@@ -15,7 +15,7 @@
           class="px-4 py-2 w-full sm:w-64 border border-gray-300 rounded-lg 
              focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400
              bg-white/50 backdrop-blur-sm placeholder-gray-500"
-          placeholder="Cari nama pegawai, NIP, email...">
+          placeholder="Cari nama pegawai, NIP,">
         <button type="submit"
           class="px-4 py-2 rounded-lg border border-gray-400 text-gray-600 font-medium 
              bg-white/40 backdrop-blur-sm hover:bg-gray-100 hover:text-gray-700

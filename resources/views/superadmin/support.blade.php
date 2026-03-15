@@ -36,7 +36,7 @@
             <div>
               <h5 class="font-semibold text-md">Video Tutorial</h5>
               <p class="text-sm text-gray-600">Tonton tutorial untuk memahami fitur-fitur Website WOLA dengan mudah</p>
-              <a href="https://youtu.be/BOm0JgveuqI" class="inline-block mt-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded text-sm transition">
+              <a href="https://youtu.be/BOm0JgveuqI" target="_blank" class="inline-block mt-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded text-sm transition">
                 Lihat Video
               </a>
             </div>

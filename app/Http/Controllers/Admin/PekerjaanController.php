@@ -30,7 +30,7 @@ class PekerjaanController extends Controller
         $teamIds = $teams->pluck('id');
 
         $tugas = Tugas::with(['pegawai', 'jenisPekerjaan', 'realisasi'])
-            //->where('asal', $user->name)
+            ->where('asal', $user->name)
             ->whereHas('jenisPekerjaan.teams', fn($q) => $q->whereIn('teams.id', $teamIds))
             ->when($search, fn($query) => $query->where(function ($q) use ($search) {
                 $q->orWhereHas('pegawai', fn($q2) => $q2->whereHas('user', fn($u) => $u->where('name', 'like', "%{$search}%"))
@@ -101,17 +101,14 @@ class PekerjaanController extends Controller
         'jenis_pekerjaan_id' => 'required|exists:jenis_pekerjaans,id',
         'target' => 'required|numeric',
         'start_date' => 'required|date',
-        'duration' => 'required|numeric|min:1'
+        'deadline' => 'required|date',
     ]);
 
     $pemberi = auth()->user()->name;
 
     $startDate = Carbon::parse($request->start_date);
 
-    //$deadline = $startDate->copy()->addDays($request->duration);
-    $duration = (int) $request->duration;
-
-    $deadline = $startDate->copy()->addDays($duration);
+    $deadline = Carbon::parse($request->deadline);
     Tugas::create([
         'pegawai_id' => $request->pegawai_id,
         'jenis_pekerjaan_id' => $request->jenis_pekerjaan_id,
@@ -186,14 +183,12 @@ class PekerjaanController extends Controller
         'jenis_pekerjaan_id' => 'required|exists:jenis_pekerjaans,id',
         'target' => 'required|numeric',
         'start_date' => 'required|date',
-        'duration' => 'required|integer|min:1'
+        'deadline' => 'required|date'
     ]);
 
     $startDate = Carbon::parse($request->start_date);
 
-    $duration = (int) $request->duration;
-
-    $deadline = $startDate->copy()->addDays($duration);
+    $deadline = Carbon::parse($request->deadline);
 
     $tugas->update([
         'pegawai_id' => $request->pegawai_id,
@@ -327,73 +322,31 @@ class PekerjaanController extends Controller
         'Template_Tugas.xlsx'
     );
 }
-public function import(Request $request)
-    {
-        $request->validate([
-            'file' => 'required|mimes:xlsx,xls,csv|max:5120'
-        ]);
 
-        $teamIds = auth()->user()->pegawai->teams->pluck('id') ?? [];
+
+public function import(Request $request)
+{
+    $request->validate([
+        'file' => 'required|mimes:xlsx,xls,csv|max:5120'
+    ]);
+
+    try {
+
+        $teamIds = auth()->user()->pegawai->teams->pluck('id');
 
         Excel::import(
-            new class ($teamIds) implements \Maatwebsite\Excel\Concerns\ToModel, \Maatwebsite\Excel\Concerns\WithHeadingRow {
-            protected $teamIds;
-            public function __construct($teamIds)
-            {
-                $this->teamIds = $teamIds;
-            }
-
-            public function model(array $row)
-            {
-                $startDate = null;
-                $deadline = null;
-
-                if (!empty($row['start_date_format_yyyy_mm_dd'])) {
-
-                    if (is_numeric($row['start_date_format_yyyy_mm_dd'])) {
-                        $startDate = Carbon::instance(
-                            Date::excelToDateTimeObject($row['start_date_format_yyyy_mm_dd'])
-                        );
-                    } else {
-                        $startDate = Carbon::parse($row['start_date_format_yyyy_mm_dd']);
-                    }
-                }
-
-                $durasi = $row['durasi_contoh_10'] ?? 0;
-
-                if ($startDate && $durasi) {
-                    $deadline = $startDate->copy()->addDays($durasi);
-                }
-                $pegawaiId = null;
-                $jenisId = null;
-
-                if (!empty($row['pegawai_id'])) {
-                    $pegawaiId = explode(' - ', $row['pegawai_id'])[0];
-                }
-
-                if (!empty($row['jenis_pekerjaan_id'])) {
-                    $jenisId = explode(' - ', $row['jenis_pekerjaan_id'])[0];
-                }
-
-                if (!$pegawaiId || !$jenisId)
-                    return null;
-
-                return new Tugas([
-                    'pegawai_id' => $pegawaiId,
-                    'jenis_pekerjaan_id' => $jenisId,
-                    'target' => $row['target'] ?? 0,
-                    'asal' => auth()->user()->name,
-                    'start_date' => $startDate,
-                    'deadline' => $deadline,
-                    'status' => 'pending',
-                ]);
-            }
-            },
+            new TugasImport($teamIds),
             $request->file('file')
         );
 
         return redirect()->route('admin.pekerjaan.index')
-            ->with('success', 'Data tugas berhasil diimport.');
+            ->with('success','Data tugas berhasil diimport.');
+
+    } catch (\Exception $e) {
+
+        return redirect()->route('admin.pekerjaan.index')
+            ->with('error', $e->getMessage());
     }
+}
 
 }

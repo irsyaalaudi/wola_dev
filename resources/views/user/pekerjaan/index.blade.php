@@ -134,7 +134,7 @@
         </div>
 
         <div class="p-4">
-          <p><strong>Tanggal Mulai: </strong> {{ \Carbon\Carbon::parse($t->created_at)->format('d M Y') }}</p>
+          <p><strong>Tanggal Mulai: </strong> {{ \Carbon\Carbon::parse($t->start_date)->format('d M Y') }}</p>
           <p><strong>Target:</strong> {{ $t->target }} {{ $t->satuan }}</p>
           <p><strong>Total Realisasi:</strong> {{ $totalRealisasi }}</p>
           <p><strong>Bobot:</strong> {{ $t->bobot_asli ?? ($t->jenisPekerjaan->bobot ?? 0) }}</p>
@@ -218,7 +218,7 @@
               <input type="number" name="realisasi" placeholder="Jumlah Realisasi" class="w-full border rounded px-3 py-2"
                 min="1" required>
               <input type="date" name="tanggal_realisasi" class="w-full border rounded px-3 py-2"
-                min="{{ $t->created_at->toDateString() }}" required>
+               required>
               <textarea name="catatan" placeholder="Catatan" class="w-full border rounded px-3 py-2"></textarea>
               <input type="file" name="file_bukti" accept=".pdf,image/*" class="w-full border rounded px-3 py-2">
               <div class="flex justify-end gap-2">

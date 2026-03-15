@@ -141,6 +141,7 @@ Route::get('/jenis-pekerjaan/template',
 Route::post('/jenis-pekerjaan/import',
     [JenisPekerjaanController::class,'import']
 )->name('superadmin.jenis-pekerjaan.import');
+
 // =========================
 // USER PANEL ROUTES
 // =========================

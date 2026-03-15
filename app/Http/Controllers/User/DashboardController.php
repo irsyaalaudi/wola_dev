@@ -26,18 +26,28 @@ class DashboardController extends Controller
                 $q->whereNull('start_date')
                     ->orWhere('start_date', '<=', now()->toDateString());
             });
-
-        if ($bulan) {
-            $query->whereMonth('created_at', $bulan);
-        }
-        if ($tahun) {
-            $query->whereYear('created_at', $tahun);
-        }
-
         if ($search) {
             $query->whereHas('jenisPekerjaan', function ($q) use ($search) {
                 $q->where('nama_pekerjaan', 'like', "%{$search}%");
             });
+        }
+        $year = $tahun ?? now()->year;
+
+        if ($bulan) {
+            $startDate = Carbon::create($year, $bulan, 1)->startOfMonth();
+            $endDate   = Carbon::create($year, $bulan, 1)->endOfMonth();
+        } elseif ($tahun) {
+            $startDate = Carbon::create($year, 1, 1)->startOfYear();
+            $endDate   = Carbon::create($year, 12, 31)->endOfYear();
+        } else {
+            $startDate = null;
+            $endDate   = null;
+        }
+
+        if ($startDate && $endDate) {
+
+            $query->whereDate('start_date', '<=', $endDate)
+                ->whereDate('deadline', '>=', $startDate);
         }
 
         $tugasSendiri = $query->get();
@@ -58,47 +68,20 @@ class DashboardController extends Controller
         ];
 
         $rincian = $tugasSendiri->map(function ($t) use ($namaBulan) {
-            $totalRealisasi = $t->semuaRealisasi->sum('realisasi');
-            $progress = $t->target > 0 ? min($totalRealisasi / $t->target, 1) : 0;
-            $bobot = $t->jenisPekerjaan->bobot ?? 0;
 
-            // Hari telat
-            $realisasiSortir = $t->semuaRealisasi->sortBy('tanggal_realisasi');
-            $akumulasi = 0;
-            $tanggalCapai100 = null;
-            foreach ($realisasiSortir as $r) {
-                $akumulasi += $r->realisasi;
-                if ($akumulasi >= $t->target) {
-                    $tanggalCapai100 = $r->tanggal_realisasi;
-                    break;
-                }
-            }
-            $hariTelat = 0;
-            if ($tanggalCapai100) {
-                if (Carbon::parse($tanggalCapai100)->gt(Carbon::parse($t->deadline))) {
-                    $hariTelat = Carbon::parse($t->deadline)->diffInDays(Carbon::parse($tanggalCapai100));
-                }
-            } else {
-                if (Carbon::now()->gt(Carbon::parse($t->deadline))) {
-                    $hariTelat = Carbon::parse($t->deadline)->diffInDays(Carbon::now());
-                }
-            }
-
-            // Penalti & nilai akhir
             $nilai = NilaiHelper::hitung($t);
 
+            $totalRealisasi = $nilai['totalRealisasi'];
             $hariTelat = $nilai['hariTelat'];
             $nilaiAkhir = $nilai['nilaiAkhir'];
 
-            // Status tugas
+            $bobot = $t->jenisPekerjaan->bobot ?? 0;
+
             $status = $t->status ?? 'pending';
 
             $tglRef = $t->start_date ?? $t->created_at;
             $tanggal = Carbon::parse($tglRef)->format('d');
-            $bulanNama = $namaBulan[(int)Carbon::parse($tglRef)->format('m')];
-
-            // Nama tim pemberi tugas
-            // $namaTim = $t->jenisPekerjaan->team->nama_tim ?? '-';
+            $bulanNama = $namaBulan[(int) Carbon::parse($tglRef)->format('m')];
 
             $namaTim = $t->jenisPekerjaan->teams->first()->nama_tim ?? '-';
 

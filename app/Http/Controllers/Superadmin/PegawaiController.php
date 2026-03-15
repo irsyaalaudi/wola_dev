@@ -19,15 +19,20 @@ class PegawaiController extends Controller
 {
     public function index(Request $request)
     {
-        $search = $request->input('search');
+        $search = strtolower($request->input('search'));
 
         // Gunakan 'teams' plural
-        $query = Pegawai::with('teams');
+        $query = Pegawai::with(['teams', 'user']);
 
         if ($search) {
-            $query->where('nama', 'like', "%{$search}%")
-                ->orWhere('nip', 'like', "%{$search}%")
-                ->orWhere('jabatan', 'like', "%{$search}%");
+            $query->where(function ($q) use ($search) {
+
+                $q->where('nip', 'like', "%{$search}%")
+                    ->orWhere('jabatan', 'like', "%{$search}%")
+                    ->orWhereHas('user', function ($q2) use ($search) {
+                        $q2->where('name', 'like', "%{$search}%");
+                    });
+            });
         }
 
         $data = $query->get();

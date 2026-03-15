@@ -20,7 +20,7 @@ class InputTugasSheet implements FromArray, WithHeadings, WithTitle, WithEvents
             'jenis_pekerjaan_id',
             'target',
             'start_date (format: yyyy-mm-dd)',
-            'durasi (contoh: 10)',
+            'deadline (format: yyyy-mm-dd)',
         ];
     }
 
@@ -79,7 +79,7 @@ class InputTugasSheet implements FromArray, WithHeadings, WithTitle, WithEvents
                 // Format durasi (angka)
                 $sheet->getStyle('E2:E200')
                     ->getNumberFormat()
-                    ->setFormatCode(NumberFormat::FORMAT_NUMBER);
+                    ->setFormatCode(NumberFormat::FORMAT_DATE_YYYYMMDD2);
 
 
                 // Validasi tanggal
@@ -93,9 +93,10 @@ class InputTugasSheet implements FromArray, WithHeadings, WithTitle, WithEvents
 
                     // DEADLINE
                     $validationDurasi = $sheet->getCell("E$row")->getDataValidation();
-                    $validationDurasi->setType(DataValidation::TYPE_WHOLE);
-                    $validationDurasi->setOperator(DataValidation::OPERATOR_GREATERTHAN);
-                    $validationDurasi->setFormula1('0');
+                    $validationDurasi->setType(DataValidation::TYPE_DATE);
+                    $validationDurasi->setOperator(DataValidation::OPERATOR_BETWEEN);
+                    $validationDurasi->setFormula1('DATE(2000,1,1)');
+                    $validationDurasi->setFormula2('DATE(2100,12,31)');
                     $validationDurasi->setAllowBlank(true);
                 }
 
@@ -103,7 +104,7 @@ class InputTugasSheet implements FromArray, WithHeadings, WithTitle, WithEvents
                 $sheet->freezePane('A2');
 
                 // Auto width
-                foreach (range('A','D') as $col) {
+                foreach (range('A','E') as $col) {
                     $sheet->getColumnDimension($col)->setAutoSize(true);
                 }
             },
