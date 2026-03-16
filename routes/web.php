@@ -30,6 +30,7 @@ use App\Http\Controllers\User\DashboardController as UserDashboardController;
 use App\Http\Controllers\User\PekerjaanController as UserPekerjaanController;
 use App\Http\Controllers\User\PegawaiController as UserPegawaiController;
 use App\Http\Controllers\User\SupportController as UserSupportController;
+use App\Http\Controllers\User\ExportLaporanController;
 
 // =========================
 // AUTH ROUTES
@@ -61,6 +62,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     Route::patch('/progress/{id}/approve', [AdminProgressController::class, 'approve'])->name('progress.approve');
     Route::get('pekerjaan/template', [AdminPekerjaanController::class, 'downloadTemplate'])
      ->name('pekerjaan.template');
+    Route::get('export_laporan', [ExportLaporanController::class, 'index'])
+        ->name('export_laporan.index');
 
 });
 
@@ -154,5 +157,9 @@ Route::prefix('user')->name('user.')->middleware(['auth', 'role:user,admin'])->g
     Route::put('pekerjaan/{id}/realisasi', [UserPekerjaanController::class, 'updateRealisasi'])->name('pekerjaan.realisasi.update');
 
     Route::get('pegawai', [UserPegawaiController::class, 'index'])->name('pegawai.index');
+    //Route::get('export_laporan', [ExportLaporanController::class, 'index'])->name('export_laporan.index');
     Route::get('/support', [UserSupportController::class, 'index'])->name('support');
+    Route::get('export_laporan', [ExportLaporanController::class, 'index'])
+        ->name('export_laporan.index');
 });
+

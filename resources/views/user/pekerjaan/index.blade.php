@@ -83,10 +83,6 @@
             Reset
           </a>
 
-          <a href="{{ route('user.pekerjaan.export') }}"
-            class="bg-green-600 text-white px-4 py-2 rounded">
-            Export Excel
-          </a>
         </div>
       </div>
     </form>

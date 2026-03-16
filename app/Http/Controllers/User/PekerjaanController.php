@@ -22,7 +22,7 @@ class PekerjaanController extends Controller
             ->where('pegawai_id', $pegawaiId)
             ->where(function ($q) {
                 $q->whereNull('start_date')
-                ->orWhere('start_date', '<=', now()->toDateString());
+                    ->orWhere('start_date', '<=', now()->toDateString());
             });
 
         // Filter nama pekerjaan
@@ -44,14 +44,19 @@ class PekerjaanController extends Controller
             });
         }
 
-        // Filter bulan
+        // Filter bulan & tahun (tugas aktif di bulan tersebut)
         if ($request->filled('bulan')) {
-            $tugasQuery->whereMonth('deadline', $request->bulan);
-        }
 
-        // Filter Tahun
-        if ($request->filled('tahun')) {
-            $tugasQuery->whereYear('deadline', $request->tahun);
+            $tahun = $request->tahun ?? now()->year;
+
+            $awalBulan = Carbon::create($tahun, $request->bulan, 1)->startOfMonth();
+            $akhirBulan = Carbon::create($tahun, $request->bulan, 1)->endOfMonth();
+
+            $tugasQuery->where(function ($q) use ($awalBulan, $akhirBulan) {
+
+                $q->whereDate('start_date', '<=', $akhirBulan)
+                    ->whereDate('deadline', '>=', $awalBulan);
+            });
         }
 
         // Filter Waktu
@@ -181,7 +186,6 @@ class PekerjaanController extends Controller
         return back()
             ->with('success', 'Realisasi berhasil disimpan.')
             ->with('scroll_to', $tugas_id);
-
     }
 
     public function updateRealisasi(Request $request, $id)
@@ -213,7 +217,7 @@ class PekerjaanController extends Controller
         }
 
         $realisasi->update($validated);
-        $totalRealisasi = $tugas->semuaRealisasi()->sum('realisasi'); 
+        $totalRealisasi = $tugas->semuaRealisasi()->sum('realisasi');
         $tugas->update([
             'status' => $totalRealisasi >= $tugas->target ? 'waiting_approval' : 'on_progress'
         ]);
@@ -224,35 +228,54 @@ class PekerjaanController extends Controller
 
     public function export(Request $request)
     {
+        $pegawaiId = auth()->user()->pegawai->id;
+
         $query = Tugas::with(['jenisPekerjaan.teams', 'semuaRealisasi'])
-            ->where('pegawai_id', auth()->user()->pegawai->id);
+            ->where('pegawai_id', $pegawaiId);
 
-        if ($request->bulan) {
-            $query->whereMonth('created_at', $request->bulan);
-        }
-
-        if ($request->tahun) {
-            $query->whereYear('created_at', $request->tahun);
-        }
-
-        if ($request->start_date) {
-            $query->whereDate('created_at', '>=', $request->start_date);
-        }
-
-        if ($request->end_date) {
-            $query->whereDate('created_at', '<=', $request->end_date);
-        }
-
-        if ($request->jenis_pekerjaan) {
+        // Filter jenis pekerjaan
+        if ($request->filled('jenis_pekerjaan')) {
             $query->whereHas('jenisPekerjaan', function ($q) use ($request) {
-                $q->where('nama_pekerjaan', 'like', '%'.$request->jenis_pekerjaan.'%');
+                $q->where('nama_pekerjaan', 'like', '%' . $request->jenis_pekerjaan . '%');
             });
+        }
+
+        // Filter tim
+        // if ($request->filled('tim')) {
+        //     $query->whereHas('jenisPekerjaan.teams', function ($q) use ($request) {
+        //         $q->where('id', $request->tim);
+        //     });
+        // }
+
+        // Filter bulan
+        // Filter bulan & tahun (tugas aktif di bulan tersebut)
+        if ($request->filled('bulan')) {
+
+            $tahun = $request->tahun ?? now()->year;
+
+            $awalBulan = Carbon::create($tahun, $request->bulan, 1)->startOfMonth();
+            $akhirBulan = Carbon::create($tahun, $request->bulan, 1)->endOfMonth();
+
+            $query->where(function ($q) use ($awalBulan, $akhirBulan) {
+
+                $q->whereDate('start_date', '<=', $akhirBulan)
+                    ->whereDate('deadline', '>=', $awalBulan);
+            });
+        }
+
+        // Filter tanggal
+        if ($request->filled('start_date') && $request->filled('end_date')) {
+            $query->whereBetween('deadline', [$request->start_date, $request->end_date]);
+        } elseif ($request->filled('start_date')) {
+            $query->where('deadline', '>=', $request->start_date);
+        } elseif ($request->filled('end_date')) {
+            $query->where('deadline', '<=', $request->end_date);
         }
 
         $tugas = $query->get();
 
         return Excel::download(
-            new \App\Exports\TugasUserExport($tugas),
+            new TugasUserExport($tugas),
             'laporan_tugas_user.xlsx'
         );
     }
