@@ -154,14 +154,14 @@
                 <!-- MODAL DETAIL PEGAWAI -->
                 <div id="modalPegawai" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
 
-                    <div class="bg-white rounded-lg shadow-lg w-full max-w-md p-6">
+                    <div class="bg-white rounded-lg shadow-lg w-full max-w-4xl p-6">
 
                         <div class="flex justify-between items-center mb-4">
                             <h3 id="modalPegawaiTitle" class="text-lg font-semibold"></h3>
                             <button onclick="closeModalPegawai()" class="text-gray-500 hover:text-black">✕</button>
                         </div>
 
-                        <div id="modalPegawaiContent" class="text-sm text-gray-700"></div>
+                        <div id="modalPegawaiContent" class="max-h-full w-full overflow-y-auto text-xl text-gray-700"></div>
 
                         <div class="mt-4 text-right">
                             <button onclick="closeModalPegawai()" class="bg-blue-500 text-white px-4 py-2 rounded">
@@ -170,6 +170,62 @@
                         </div>
 
                     </div>
+                </div>
+            </div>
+            <div class="mt-10">
+
+                <h3 class="text-lg font-semibold mb-4 text-gray-800">
+                    Aktivitas Pegawai
+                </h3>
+
+                <div class="overflow-x-auto">
+                    <table class="border border-blue-400 border-separate border-spacing-0 text-sm w-full">
+
+                        <thead>
+                            <tr>
+                                <th class="px-3 py-2 border border-blue-400 bg-blue-400 text-white sticky left-0 z-20">No
+                                </th>
+                                <th
+                                    class="px-3 py-2 border border-blue-400 bg-blue-400 text-white sticky left-[44px] z-20">
+                                    Pegawai</th>
+
+                                @foreach ($timeline as $t)
+                                    <th class="px-2 py-2 border border-blue-400 text-center bg-blue-400 text-white">
+                                        {{ $t }}
+                                    </th>
+                                @endforeach
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            @foreach ($heatmap as $index => $row)
+                                <tr>
+                                    <td class="border border-blue-400 px-2 text-center sticky left-0 bg-white z-10">
+                                        {{ $index + 1 }}
+                                    </td>
+
+                                    <td class="px-3 py-2 border border-blue-400 sticky left-[44px] bg-white z-10">
+                                        {{ $row['pegawai'] }}
+                                    </td>
+
+                                    @foreach ($row['cells'] as $cell)
+                                        <td class="border border-blue-400 w-6 h-6 text-center">
+                                            <div class="w-5 h-5 mx-auto rounded
+                                    {{ $cell['active'] ? 'bg-blue-500' : 'bg-gray-200' }}"
+                                                title="
+                                    {{ $row['pegawai'] }}
+                                    {{ $timeline[$loop->index] }} {{ request('tahun', now()->year) }}
+                                    {{ $cell['count'] }} aktivitas
+                                    Total realisasi: {{ $cell['total_realisasi'] ?? 0 }}
+                                    ">
+                                            </div>
+                                        </td>
+                                    @endforeach
+                                </tr>
+                            @endforeach
+                        </tbody>
+
+                    </table>
                 </div>
             </div>
 
@@ -378,7 +434,7 @@ container.style.gridTemplateRows = `repeat(${rows}, auto)`;
 
                             const tugas = tugasPegawai[index] || [];
 
-                            html += `<ul class="list-disc ml-5 space-y-1">`;
+                            html += `<ul class="list-disc ml-5 space-y-1 overflow-y-auto max-h-[800px]">`;
 
                             tugas.forEach(function(t) {
                                 html += `<li>${t}</li>`;
@@ -398,25 +454,25 @@ container.style.gridTemplateRows = `repeat(${rows}, auto)`;
 
                             const detail = realisasiDetail[index] || [];
 
-                            html += `<div class="max-h-[500px] overflow-y-auto">
-                        <table class="w-full text-sm border">
-                        <thead class="bg-gray-100">
-                        <tr>
-                        <th class="border px-2 py-1">No</th>
-                        <th class="border px-2 py-1">Tugas</th>
-                        <th class="border px-2 py-1">Realisasi</th>
-                        </tr>
-                        </thead>
-                        <tbody>`;
+                            html += `<div class="max-h-[800px] w-full overflow-y-auto">
+                            <table class="w-full text-xl border">
+                            <thead class="bg-gray-100">
+                            <tr>
+                            <th class="border px-2 py-1">No</th>
+                            <th class="border px-2 py-1">Tugas</th>
+                            <th class="border px-2 py-1">Realisasi</th>
+                            </tr>
+                            </thead>
+                            <tbody>`;
 
                             detail.forEach(function(d, i) {
                                 html += `
-                    <tr>
-                    <td class="border px-2 py-1 text-center">${i+1}</td>
-                    <td class="border px-2 py-1">${d.nama}</td>
-                    <td class="border px-2 py-1 text-center">${d.realisasi}</td>
-                    </tr>
-                `;
+                                <tr>
+                                <td class="border px-2 py-1 text-center">${i+1}</td>
+                                <td class="border px-2 py-1">${d.nama}</td>
+                                <td class="border px-2 py-1 text-center">${d.realisasi}</td>
+                                </tr>
+                            `;
                             });
                             html += `</tbody></table></div>`;
 
@@ -441,7 +497,7 @@ container.style.gridTemplateRows = `repeat(${rows}, auto)`;
         const containerPegawai = document.createElement('div');
 
         const totalPegawai = namaPegawai.length;
-        const columnsPegawai = 3;
+        const columnsPegawai = 4;
         const rowsPegawai = Math.ceil(totalPegawai / columnsPegawai);
 
         containerPegawai.className = `mt-4 grid grid-flow-col gap-3 text-sm text-gray-700`;

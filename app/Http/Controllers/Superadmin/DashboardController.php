@@ -7,17 +7,19 @@ use Illuminate\Http\Request;
 use App\Models\Pegawai;
 use App\Models\Team;
 use App\Models\Tugas;
+use App\Models\RealisasiTugas;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use App\Helpers\NilaiHelper;
+use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
     public function index(Request $request)
     {
         $bulan = $request->input('bulan');
-        $tahun = $request->input('tahun');
+        $tahun = $request->input('tahun') ?? now()->year;
 
-        $year = $tahun ?? now()->year;
+        $year = $tahun;
         // filter bulan tahun
         if ($bulan) {
             $startDate = \Carbon\Carbon::create($year, $bulan, 1)->startOfMonth();
@@ -26,8 +28,9 @@ class DashboardController extends Controller
             $startDate = \Carbon\Carbon::create($year, 1, 1)->startOfYear();
             $endDate   = \Carbon\Carbon::create($year, 12, 31)->endOfYear();
         } else {
-            $startDate = null;
-            $endDate   = null;
+            // Default ke tahun sekarang jika tidak ada filter
+            $startDate = \Carbon\Carbon::create($year, 1, 1)->startOfYear();
+            $endDate   = \Carbon\Carbon::create($year, 12, 31)->endOfYear();
         }
 
         // ambil semua tim untuk header tabel
@@ -235,6 +238,92 @@ class DashboardController extends Controller
         $chartTugas = $pegawaiSummary->pluck('tugas')->values()->toArray();
         $chartRealisasiDetail = $pegawaiSummary->pluck('realisasi_detail')->values()->toArray();
 
+        // ===============================
+        // HEATMAP TIMELINE
+        // ===============================
+
+        $timeline = [];
+
+        if ($bulan) {
+
+            $daysInMonth = Carbon::create($year, $bulan)->daysInMonth;
+
+            for ($i = 1; $i <= $daysInMonth; $i++) {
+                $timeline[] = $i;
+            }
+        } elseif ($tahun) {
+
+            $timeline = [
+                'Jan',
+                'Feb',
+                'Mar',
+                'Apr',
+                'Mei',
+                'Jun',
+                'Jul',
+                'Agu',
+                'Sep',
+                'Okt',
+                'Nov',
+                'Des'
+            ];
+        }
+        // ===============================
+        // DATA AKTIVITAS REALISASI
+        // ===============================
+
+        $aktivitas = RealisasiTugas::selectRaw("
+                tugas.pegawai_id,
+                DATE(tanggal_realisasi) as tanggal,
+                COUNT(*) as total,
+                SUM(realisasi) as total_realisasi
+            ")
+            ->join('tugas', 'realisasi_tugas.tugas_id', '=', 'tugas.id')
+            ->whereBetween('tanggal_realisasi', [$startDate, $endDate])
+            ->groupBy('tugas.pegawai_id', 'tanggal')
+            ->get()
+            ->groupBy('pegawai_id');
+
+        // ===============================
+        // HEATMAP DATA
+        // ===============================
+
+        $heatmap = $pegawais->map(function ($pegawai) use ($timeline, $aktivitas, $bulan, $year) {
+            $pegawaiAktivitas = $aktivitas[$pegawai->id] ?? collect();
+
+            $cells = collect($timeline)->map(function ($time) use ($pegawaiAktivitas, $bulan, $year) {
+                if ($bulan) {
+                    // Logika per hari (Bulanan)
+                    $date = Carbon::create($year, $bulan, $time)->toDateString();
+                    $foundData = $pegawaiAktivitas->firstWhere('tanggal', $date);
+
+                    $totalCount = $foundData->total ?? 0;
+                    $totalReal = $foundData->total_realisasi ?? 0;
+                } else {
+                    // Logika per bulan (Tahunan)
+                    // $time di sini adalah 'Jan', 'Feb', dst.
+                    $filtered = $pegawaiAktivitas->filter(function ($row) use ($time) {
+                        return Carbon::parse($row->tanggal)->format('M') == $time;
+                    });
+
+                    $totalCount = $filtered->sum('total');
+                    $totalReal = $filtered->sum('total_realisasi');
+                }
+
+                return [
+                    // KUNCI PERBAIKAN: active hanya true jika totalCount > 0
+                    'active' => $totalCount > 0,
+                    'count'  => $totalCount,
+                    'total_realisasi' => $totalReal
+                ];
+            });
+
+            return [
+                'pegawai' => $pegawai->nama,
+                'cells' => $cells
+            ];
+        });
+
         return view('superadmin.dashboard', compact(
             'data',
             'teams',
@@ -248,7 +337,9 @@ class DashboardController extends Controller
             'chartTarget',
             'chartTugas',
             'chartRealisasiDetail',
-            'chartRealisasi'
+            'chartRealisasi',
+            'timeline',
+            'heatmap'
         ));
     }
     public function exportExcel(Request $request)
@@ -327,9 +418,9 @@ class DashboardController extends Controller
                             $startDate = \Carbon\Carbon::create($year, 1, 1)->startOfYear();
                             $endDate   = \Carbon\Carbon::create($year, 12, 31)->endOfYear();
                         } else {
-
-                            $startDate = null;
-                            $endDate   = null;
+                            // Default ke tahun sekarang jika tidak ada filter
+                            $startDate = \Carbon\Carbon::create($year, 1, 1)->startOfYear();
+                            $endDate   = \Carbon\Carbon::create($year, 12, 31)->endOfYear();
                         }
 
                         if ($startDate && $endDate) {

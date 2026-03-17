@@ -165,6 +165,78 @@ class DashboardController extends Controller
             })->values()->toArray();
         })->values()->toArray();
 
+        // ============================
+        // HEATMAP AKTIVITAS PEGAWAI
+        // ============================
+
+        $year = $tahun ?? now()->year;
+
+        // 1. Definisikan Timeline
+        if ($bulan) {
+            $days = Carbon::create($year, $bulan, 1)->daysInMonth;
+            $timeline = collect(range(1, $days));
+        } else {
+            $timeline = collect(['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']);
+        }
+
+        // 2. Ambil Data Realisasi
+        $allRealisasi = Tugas::with(['semuaRealisasi'])
+            ->whereIn('pegawai_id', $memberIds)
+            ->where('asal', auth()->user()->name)
+            ->get();
+
+        // 3. Proses Heatmap
+        $heatmap = $members->map(function ($pegawai) use ($timeline, $bulan, $year, $allRealisasi) {
+
+            // Ambil tugas milik pegawai ini saja
+            $pegawaiTasks = $allRealisasi->where('pegawai_id', $pegawai->id);
+
+            // Ambil semua realisasi dari tugas-tugas tersebut
+            $allRealisasiPegawai = $pegawaiTasks->flatMap->semuaRealisasi;
+
+            $cells = $timeline->map(function ($t) use ($allRealisasiPegawai, $bulan, $year) {
+                $filtered = $allRealisasiPegawai->filter(function ($r) use ($t, $bulan, $year) {
+                    $date = Carbon::parse($r->tanggal_realisasi);
+
+                    if ($bulan) {
+                        return $date->day == $t
+                            && $date->month == $bulan
+                            && $date->year == $year;
+                    }
+
+                    // Mapping bulan jika filter tahunan (Jan, Feb, dst)
+                    $monthMap = [
+                        'Jan' => 1,
+                        'Feb' => 2,
+                        'Mar' => 3,
+                        'Apr' => 4,
+                        'Mei' => 5,
+                        'Jun' => 6,
+                        'Jul' => 7,
+                        'Agu' => 8,
+                        'Sep' => 9,
+                        'Okt' => 10,
+                        'Nov' => 11,
+                        'Des' => 12
+                    ];
+
+                    return $date->month == $monthMap[$t] && $date->year == $year;
+                });
+
+                return [
+                    'active' => $filtered->count() > 0,
+                    'count' => $filtered->count(),
+                    'total_realisasi' => $filtered->sum('realisasi')
+                ];
+            });
+
+            return [
+                'pegawai' => $pegawai->nama,
+                'cells' => $cells
+            ];
+        });
+
+
         return view('admin.dashboard', compact(
             'members',
             'tasks',
@@ -185,7 +257,9 @@ class DashboardController extends Controller
             'grafikPegawaiTugas',
             'grafikPegawaiRealisasiDetail',
 
-            'labelBulanTahun'
+            'labelBulanTahun',
+            'timeline',
+            'heatmap'
         ));
     }
 
