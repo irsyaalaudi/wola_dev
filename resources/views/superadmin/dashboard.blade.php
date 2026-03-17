@@ -21,7 +21,7 @@
 
                     {{-- Input Tahun --}}
                     <input type="number" name="tahun" class="px-4 py-2 border rounded-lg w-24" placeholder="Tahun"
-                        value="{{ request('tahun') }}">
+                        value="{{ request('tahun', now()->year) }}">
 
                     {{-- Search --}}
                     <input type="text" name="search" class="px-4 py-2 border rounded-lg"
@@ -82,8 +82,10 @@
                     <table class="table-auto text-sm text-gray-700 border-separate border-spacing-0 min-w-max relative">
                         <thead class="text-gray-700 text-center">
                             <tr>
-                                <th rowspan="2" class="px-3 py-2 border-r border-gray-300 sticky top-0 left-0 bg-blue-100 z-30">No.</th>
-                                <th rowspan="2" class="px-3 py-2 border-r border-gray-300 text-left sticky top-0 left-12 bg-blue-100 z-30">
+                                <th rowspan="2"
+                                    class="px-3 py-2 border-r border-gray-300 sticky top-0 left-0 bg-blue-100 z-30">No.</th>
+                                <th rowspan="2"
+                                    class="px-3 py-2 border-r border-gray-300 text-left sticky top-0 left-12 bg-blue-100 z-30">
                                     Nama Pegawai</th>
                                 <th rowspan="2" class="px-3 py-2 border sticky top-0 bg-blue-100 z-10">Jabatan</th>
                                 <th rowspan="2" class="px-3 py-2 border sticky top-0 bg-blue-100 z-10">Score (%)</th>
@@ -124,7 +126,7 @@
                                         <td class="px-3 py-2 border text-center text-blue-700 font-semibold">
                                             {{ $row ? number_format($row['total_target'], 2) : '0.00' }}
                                         </td>
-                                        <td class="px-3 py-2 border text-center text-green-600 font-semibold">
+                                        <td class="px-3 py-2 border text-center text-blue-700 font-semibold">
                                             {{ $row ? number_format($row['total_realisasi'], 2) : '0.00' }}
                                         </td>
                                     @endforeach
@@ -155,14 +157,14 @@
             <canvas id="targetRealisasiChart" height="120"></canvas>
             <div id="modalPegawai" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
 
-                <div class="bg-white rounded-lg shadow-lg w-full max-w-lg p-6">
+                <div class="bg-white rounded-lg shadow-lg w-full max-w-4xl p-6">
 
                     <div class="flex justify-between mb-4">
                         <h3 id="modalPegawaiTitle" class="text-lg font-semibold"></h3>
                         <button onclick="closeModalPegawai()">✕</button>
                     </div>
 
-                    <div id="modalPegawaiContent" class="max-h-[350px] overflow-y-auto text-sm text-gray-700"></div>
+                    <div id="modalPegawaiContent" class="max-h-full w-full overflow-y-auto text-xl text-gray-700"></div>
 
                     <div class="mt-4 text-right">
                         <button onclick="closeModalPegawai()" class="bg-blue-500 text-white px-4 py-2 rounded">
@@ -171,7 +173,80 @@
                     </div>
 
                 </div>
+
             </div>
+
+            <div id="legendPegawai"></div>
+
+            {{-- HEATMAP AKTIVITAS --}}
+<div class="mt-10">
+
+    <h3 class="text-lg font-semibold mb-4 text-gray-800">
+        Aktivitas Pegawai
+    </h3>
+
+    <div class="overflow-x-auto">
+        <table class="border border-blue-400 border-separate border-spacing-0 text-sm w-full">
+
+            <!-- HEADER -->
+            <thead>
+                <tr>
+                    <th class="px-3 py-2 border border-blue-400 bg-blue-400 text-white sticky left-0 z-20">
+                        No
+                    </th>
+
+                    <th class="px-3 py-2 border border-blue-400 bg-blue-400 text-white sticky left-[44px] z-20">
+                        Pegawai
+                    </th>
+
+                    @foreach ($timeline as $t)
+                        <th class="px-2 py-2 border border-blue-400 text-center bg-blue-400 text-white">
+                            {{ $t }}
+                        </th>
+                    @endforeach
+                </tr>
+            </thead>
+
+            <!-- BODY -->
+            <tbody>
+                @foreach ($heatmap as $index => $row)
+                    <tr>
+
+                        <!-- NO -->
+                        <td class="border border-blue-400 px-2 text-center sticky left-0 bg-white z-10">
+                            {{ $index + 1 }}
+                        </td>
+
+                        <!-- NAMA -->
+                        <td class="px-3 py-2 border border-blue-400 sticky left-[44px] bg-white z-10">
+                            {{ $row['pegawai'] }}
+                        </td>
+
+                        <!-- CELL -->
+                        @foreach ($row['cells'] as $cell)
+                            <td class="border border-blue-400 w-6 h-6 text-center">
+
+                                <div class="w-5 h-5 mx-auto rounded
+                                    {{ $cell['active'] ? 'bg-blue-500' : 'bg-gray-200' }}"
+                                    
+                                    title="
+{{ $row['pegawai'] }}
+{{ $timeline[$loop->index] }} {{ request('tahun', now()->year) }}
+{{ $cell['count'] }} aktivitas
+Total realisasi: {{ $cell['total_realisasi'] ?? 0 }}
+                                    ">
+                                </div>
+
+                            </td>
+                        @endforeach
+
+                    </tr>
+                @endforeach
+            </tbody>
+
+        </table>
+    </div>
+</div>
 
         </div>
     </div>
@@ -243,7 +318,7 @@
 
                             const tugas = tugasPegawai[index] || [];
 
-                            html += `<ul class="list-disc ml-5 space-y-1">`;
+                            html += `<ul class="list-disc ml-5 space-y-1 overflow-y-auto max-h-[800px]">`;
 
                             tugas.forEach(function(t) {
                                 html += `<li>${t}</li>`;
@@ -263,20 +338,22 @@
                             const detail = realisasiDetail[index] || [];
 
                             html += `
-                    <div class="max-h-[250px] overflow-y-auto">
-                    <table class="w-full text-sm border">
-                        <thead class="bg-gray-100 sticky top-0">
-                            <tr>
-                                <th class="border px-2 py-1">Tugas</th>
-                                <th class="border px-2 py-1">Realisasi</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                    `;
+                            <div class="max-h-[800px] w-full overflow-y-auto">
+                            <table class="w-full text-xl border">
+                                <thead class="bg-gray-100 sticky top-0">
+                                    <tr>
+                                        <th class="border px-2 py-1">No</th>
+                                        <th class="border px-2 py-1">Tugas</th>
+                                        <th class="border px-2 py-1">Realisasi</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                            `;
 
-                            detail.forEach(function(d) {
+                            detail.forEach(function(d, i) {
                                 html += `
                         <tr>
+                            <td class="border px-2 py-1 text-center">${i+1}</td>
                             <td class="border px-2 py-1">${d.nama}</td>
                             <td class="border px-2 py-1 text-center">${d.realisasi}</td>
                         </tr>
@@ -301,7 +378,7 @@
         const container = document.createElement('div');
 
         const total = namaPegawai.length;
-        const columns = 3;
+        const columns = 5;
         const rows = Math.ceil(total / columns);
 
         container.className = `mt-4 grid grid-flow-col gap-3 text-sm text-gray-700`;
@@ -320,7 +397,7 @@
             container.appendChild(row);
         });
 
-        document.getElementById('targetRealisasiChart').parentNode.appendChild(container);
+        document.getElementById('legendPegawai').appendChild(container);
 
         function closeModalPegawai() {
             document.getElementById("modalPegawai").classList.add("hidden");
