@@ -31,27 +31,40 @@ class ExportLaporanController extends Controller
             });
         }
 
-        // Filter bulan dan tahun
-        // Filter bulan dan tahun (tugas yang aktif pada bulan tersebut)
-        if ($request->filled('bulan') && $request->filled('tahun')) {
 
-            $awalBulan = Carbon::create($request->tahun, $request->bulan, 1)->startOfMonth();
-            $akhirBulan = Carbon::create($request->tahun, $request->bulan, 1)->endOfMonth();
+        // =========================
+        // FILTER BULAN (HANYA JIKA TIDAK ADA TANGGAL)
+        // =========================
+        if (!$request->filled('start_date') && !$request->filled('end_date')) {
 
-            $query->where(function ($q) use ($awalBulan, $akhirBulan) {
+            if ($request->filled('bulan') && $request->filled('tahun')) {
 
-                $q->whereDate('start_date', '<=', $akhirBulan)
-                    ->whereDate('deadline', '>=', $awalBulan);
-            });
+                $awalBulan = Carbon::create($request->tahun, $request->bulan, 1)->startOfMonth();
+                $akhirBulan = Carbon::create($request->tahun, $request->bulan, 1)->endOfMonth();
+
+                $query->where(function ($q) use ($awalBulan, $akhirBulan) {
+                    $q->whereDate('start_date', '<=', $akhirBulan)
+                        ->whereDate('deadline', '>=', $awalBulan);
+                });
+            }
         }
 
         // Filter tanggal
+        // =========================
+        // FILTER TANGGAL (FIX OVERLAP)
+        // =========================
         if ($request->filled('start_date') && $request->filled('end_date')) {
-            $query->whereBetween('deadline', [$request->start_date, $request->end_date]);
+
+            $query->where(function ($q) use ($request) {
+                $q->whereDate('start_date', '<=', $request->end_date)
+                    ->whereDate('deadline', '>=', $request->start_date);
+            });
         } elseif ($request->filled('start_date')) {
-            $query->where('deadline', '>=', $request->start_date);
+
+            $query->whereDate('deadline', '>=', $request->start_date);
         } elseif ($request->filled('end_date')) {
-            $query->where('deadline', '<=', $request->end_date);
+
+            $query->whereDate('start_date', '<=', $request->end_date);
         }
 
         $tugas = $query->get();

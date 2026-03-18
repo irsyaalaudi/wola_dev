@@ -233,22 +233,18 @@ class PekerjaanController extends Controller
         $query = Tugas::with(['jenisPekerjaan.teams', 'semuaRealisasi'])
             ->where('pegawai_id', $pegawaiId);
 
-        // Filter jenis pekerjaan
+        // =========================
+        // FILTER JENIS PEKERJAAN
+        // =========================
         if ($request->filled('jenis_pekerjaan')) {
             $query->whereHas('jenisPekerjaan', function ($q) use ($request) {
                 $q->where('nama_pekerjaan', 'like', '%' . $request->jenis_pekerjaan . '%');
             });
         }
 
-        // Filter tim
-        // if ($request->filled('tim')) {
-        //     $query->whereHas('jenisPekerjaan.teams', function ($q) use ($request) {
-        //         $q->where('id', $request->tim);
-        //     });
-        // }
-
-        // Filter bulan
-        // Filter bulan & tahun (tugas aktif di bulan tersebut)
+        // =========================
+        // FILTER BULAN & TAHUN
+        // =========================
         if ($request->filled('bulan')) {
 
             $tahun = $request->tahun ?? now()->year;
@@ -257,21 +253,35 @@ class PekerjaanController extends Controller
             $akhirBulan = Carbon::create($tahun, $request->bulan, 1)->endOfMonth();
 
             $query->where(function ($q) use ($awalBulan, $akhirBulan) {
-
                 $q->whereDate('start_date', '<=', $akhirBulan)
                     ->whereDate('deadline', '>=', $awalBulan);
             });
+        } elseif ($request->filled('tahun')) {
+
+            // kalau hanya tahun
+            $query->whereYear('start_date', $request->tahun);
         }
 
-        // Filter tanggal
+        // =========================
+        // FILTER TANGGAL CUSTOM
+        // =========================
         if ($request->filled('start_date') && $request->filled('end_date')) {
-            $query->whereBetween('deadline', [$request->start_date, $request->end_date]);
+
+            $query->where(function ($q) use ($request) {
+                $q->whereDate('start_date', '<=', $request->end_date)
+                    ->whereDate('deadline', '>=', $request->start_date);
+            });
         } elseif ($request->filled('start_date')) {
-            $query->where('deadline', '>=', $request->start_date);
+
+            $query->whereDate('deadline', '>=', $request->start_date);
         } elseif ($request->filled('end_date')) {
-            $query->where('deadline', '<=', $request->end_date);
+
+            $query->whereDate('start_date', '<=', $request->end_date);
         }
 
+        // =========================
+        // EXECUTE
+        // =========================
         $tugas = $query->get();
 
         return Excel::download(

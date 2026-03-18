@@ -111,55 +111,83 @@ class UserController extends Controller
     // =========================
     // UPDATE
     // =========================
-    public function update(Request $request, $id)
-    {
-        $user = User::with('pegawai.teams')->findOrFail($id);
+public function update(Request $request, $id)
+{
+    $user = User::with('pegawai.teams')->findOrFail($id);
 
-        $validated = $request->validate([
-            'nama'    => 'required',
-            'nip'     => 'required|unique:pegawais,nip,' . $user->pegawai->id, // gunakan pegawai->id, bukan pegawai_id
-            'jabatan' => 'required',
-            'teams'   => 'required|array|min:1',
-            'teams.*' => 'exists:teams,id',
-            'leader'  => 'nullable|array',
-            'leader.*' => 'exists:teams,id',
-            'name'    => 'required',
-            'email'   => 'required|email|unique:users,email,' . $id,
-            'password' => 'nullable|min:6',
-            'role'    => 'required|in:superadmin,admin,user',
-        ]);
-
-        $user->pegawai->update([
-            'nip'     => $validated['nip'],
-            'jabatan' => $validated['jabatan'],
-        ]);
-
-        // Sinkronisasi tim + leader
-        $syncData = [];
-        foreach ($validated['teams'] as $teamId) {
-            $isLeader = false;
-            if (!empty($validated['leader']) && in_array($teamId, $validated['leader'])) {
-                $existingLeader = Team::find($teamId)
-                    ->pegawais()
-                    ->wherePivot('is_leader', true)
-                    ->where('pegawai_id', '!=', $user->pegawai->id)
-                    ->first();
-                if (!$existingLeader) $isLeader = true;
-            }
-            $syncData[$teamId] = ['is_leader' => $isLeader];
-        }
-        $user->pegawai->teams()->sync($syncData);
-
-        // Update user
-        $user->update([
-            'name'     => $validated['nama'],
-            'email'    => $validated['email'],
-            'role'     => $validated['role'],
-            'password' => !empty($validated['password']) ? Hash::make($validated['password']) : $user->password,
-        ]);
-
-        return back()->with('success', 'User & Pegawai berhasil diperbarui.');
+    if (!$user->pegawai) {
+        return back()->with('error', 'Data pegawai tidak ditemukan.');
     }
+
+    $validated = $request->validate([
+        'nama'    => 'required',
+        'nip'     => 'required|unique:pegawais,nip,' . $user->pegawai->id,
+        'jabatan' => 'required',
+
+        'teams'   => 'required|array|min:1',
+        'teams.*' => 'exists:teams,id',
+
+        'leader'   => 'nullable|array',
+        'leader.*' => 'exists:teams,id',
+
+        'email'   => 'required|email|unique:users,email,' . $id,
+        'password' => 'nullable|min:6',
+        'role'    => 'required|in:superadmin,admin,user',
+    ]);
+
+    // =========================
+    // UPDATE PEGAWAI
+    // =========================
+    $user->pegawai->update([
+        'nip'     => $validated['nip'],
+        'jabatan' => $validated['jabatan'],
+    ]);
+
+    // =========================
+    // SYNC TEAM + LEADER
+    // =========================
+    $syncData = [];
+
+    foreach ($validated['teams'] as $teamId) {
+
+        $isLeader = false;
+
+        if (!empty($validated['leader']) && in_array($teamId, $validated['leader'])) {
+
+            $existingLeader = Team::find($teamId)
+                ->pegawais()
+                ->wherePivot('is_leader', true)
+                ->where('pegawai_id', '!=', $user->pegawai->id)
+                ->first();
+
+            if (!$existingLeader) {
+                $isLeader = true;
+            }
+        }
+
+        $syncData[$teamId] = ['is_leader' => $isLeader];
+    }
+
+    $user->pegawai->teams()->sync($syncData);
+
+    // =========================
+    // UPDATE USER
+    // =========================
+    $user->update([
+        'name'  => $validated['nama'], // 🔥 FIX disini
+        'email' => $validated['email'],
+        'role'  => $validated['role'],
+    ]);
+
+    // Update password jika diisi
+    if (!empty($validated['password'])) {
+        $user->update([
+            'password' => Hash::make($validated['password'])
+        ]);
+    }
+
+    return back()->with('success', 'User & Pegawai berhasil diperbarui.');
+}
 
     // =========================
     // DELETE
