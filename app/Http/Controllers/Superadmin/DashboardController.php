@@ -66,14 +66,6 @@ class DashboardController extends Controller
                     }
                 });
             })
-            // ->when($bulan || $tahun, function ($q) use ($bulan, $tahun) {
-            //     $q->whereHas('tugas', function ($q2) use ($bulan, $tahun) {
-            //         if ($bulan)
-            //             $q2->whereMonth('created_at', $bulan);
-            //         if ($tahun)
-            //             $q2->whereYear('created_at', $tahun);
-            //     });
-            // })
             ->when($startDate && $endDate, function ($q) use ($startDate, $endDate) {
 
                 $q->whereHas('tugas', function ($q2) use ($startDate, $endDate) {
@@ -86,12 +78,6 @@ class DashboardController extends Controller
 
         // kartu ringkasan
         $totalPegawai = Pegawai::count();
-
-        // $tugasQuery = Tugas::query();
-        // if ($bulan)
-        //     $tugasQuery->whereMonth('created_at', $bulan);
-        // if ($tahun)
-        //     $tugasQuery->whereYear('created_at', $tahun);
         $tugasQuery = Tugas::query();
 
         if ($startDate && $endDate) {
@@ -137,10 +123,6 @@ class DashboardController extends Controller
                     $q->whereHas('teams', fn($t) => $t->where('teams.id', $team->id));
                 });
 
-                // if ($bulan)
-                //     $tugasQuery->whereMonth('created_at', $bulan);
-                // if ($tahun)
-                //     $tugasQuery->whereYear('created_at', $tahun);
                 if ($startDate && $endDate) {
 
                     $tugasQuery->whereDate('start_date', '<=', $endDate)
@@ -190,11 +172,6 @@ class DashboardController extends Controller
                 'grand_realisasi' => $grandRealisasi,
             ];
         });
-
-        // $tasks = Tugas::with(['pegawai', 'jenisPekerjaan', 'semuaRealisasi']);
-
-        // if ($bulan) $tasks->whereMonth('created_at', $bulan);
-        // if ($tahun) $tasks->whereYear('created_at', $tahun);
 
         $tasks = Tugas::with(['pegawai', 'jenisPekerjaan', 'semuaRealisasi']);
 

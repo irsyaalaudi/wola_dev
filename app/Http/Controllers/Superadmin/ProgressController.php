@@ -119,51 +119,6 @@ class ProgressController extends Controller
             {
                 $tugas = Tugas::with(['pegawai.user', 'semuaRealisasi', 'jenisPekerjaan.teams'])->get();
 
-                // return $tugas->map(function ($tugas, $index) {
-                //     // hitung nilai akhir per tugas
-
-
-                //     $target    = $tugas->target ?? 0;
-                //     $approved = $tugas->semuaRealisasi->where('is_approved', true);
-                //     $realisasi = $approved->sum('realisasi');
-                //     $tglReal = $approved->max('tanggal_realisasi');
-                //     $progress  = $target > 0 ? min($realisasi / $target, 1) : 0;
-                //     $bobot     = $tugas->jenisPekerjaan->bobot ?? 0;
-
-                //     $deadline  = $tugas->deadline;
-                //     $tglReal = $approved->max('tanggal_realisasi');
-                //     $hariTelat = 0;
-                //     if ($deadline && $tglReal && strtotime($tglReal) > strtotime($deadline)) {
-                //         $hariTelat = (new \Carbon\Carbon($deadline))->diffInDays(new \Carbon\Carbon($tglReal));
-                //     }
-                //     $penalti = $bobot * 0.1 * $hariTelat;
-                //     $hasil = \App\Helpers\NilaiHelper::hitung($tugas);
-
-                //     $bobot = $hasil['bobot'];
-                //     $nilaiAkhirTugas = $hasil['nilaiAkhir'];
-                
-
-                //     //$nilaiAkhirTugas = max(0, ($bobot * $progress) - $penalti);
-
-                //     return [
-                //         'No'                => $index + 1,
-                //         'Nama Pegawai'      => $tugas->pegawai->user->name ?? '-',
-                //         'Nama Pekerjaan'    => $tugas->jenisPekerjaan->nama_pekerjaan ?? '-',
-                //         'Nama Tim'          => $tugas->jenisPekerjaan->team->nama_tim ?? '-',
-                //         'Asal'              => $tugas->asal ?? '-',
-                //         'Target'            => $tugas->target ?? 0,
-                //         'Realisasi'         => $realisasi,
-                //         'Satuan'            => $tugas->jenisPekerjaan->satuan ?? '-',
-                //         'Deadline'          => $tugas->deadline
-                //             ? date('d-m-Y', strtotime($tugas->deadline)) : '-',
-                //         'Tanggal Realisasi' => $tglReal ? date('d-m-Y', strtotime($tglReal)) : '-',
-                //         'Bobot'             => $bobot,
-                //         'Nilai Akhir'       => round($nilaiAkhirTugas, 2),
-                //         'Catatan' => $approved->last()?->catatan ?? '-',
-                //         'Bukti'   => $approved->last()?->file_bukti ?? '-',
-                //     ];
-                // });
-
                 return $tugas->map(function ($tugas, $index) {
 
                 $approved = $tugas->semuaRealisasi->where('is_approved', true);

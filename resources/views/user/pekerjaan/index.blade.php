@@ -138,10 +138,10 @@
           <p><strong>Nilai Akhir:</strong> {{ $t->nilai_akhir ?? 0 }}</p>
           <p>
             <strong>Tanggal Akhir:</strong> {{ \Carbon\Carbon::parse($t->deadline)->format('d M Y') }}
-            @if($t->is_late)
-              <span class="ml-2 bg-red-500 text-white px-2 py-1 rounded text-xs">Terlambat</span>
-            @else
-              <span class="ml-2 bg-green-500 text-white px-2 py-1 rounded text-xs">Tepat Waktu</span>
+            @if($t->is_completed)
+                <span class="ml-2 text-white px-2 py-1 rounded text-xs {{ $t->is_late ? 'bg-red-500' : 'bg-green-500' }}">
+                    {{ $t->is_late ? 'Terlambat' : 'Tepat Waktu' }}
+                </span>
             @endif
           </p>
 

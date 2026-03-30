@@ -62,8 +62,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     Route::patch('/progress/{id}/approve', [AdminProgressController::class, 'approve'])->name('progress.approve');
     Route::get('pekerjaan/template', [AdminPekerjaanController::class, 'downloadTemplate'])
      ->name('pekerjaan.template');
-    Route::get('export_laporan', [ExportLaporanController::class, 'index'])
-        ->name('export_laporan.index');
+    // Route::get('export_laporan', [ExportLaporanController::class, 'index'])
+    //     ->name('export_laporan.index');
 
 });
 
@@ -96,7 +96,6 @@ Route::prefix('superadmin')->name('superadmin.')->middleware(['auth', 'role:supe
     Route::put('jenis-pekerjaan/{id}', [JenisPekerjaanController::class, 'update'])->name('jenis-pekerjaan.update');
     Route::delete('jenis-pekerjaan/{id}', [JenisPekerjaanController::class, 'destroy'])->name('jenis-pekerjaan.destroy');
 
-    // ✅ Tambahan Export Jenis Pekerjaan (langsung dari Controller)
     Route::get('jenis-pekerjaan/export', [JenisPekerjaanController::class, 'export'])->name('jenis-pekerjaan.export');
     // Tambah Import data Jenis Pekerjaan
     Route::post('jenis-pekerjaan/import', [JenisPekerjaanController::class, 'import'])->name('jenis-pekerjaan.import');

@@ -17,15 +17,27 @@
             <div class="flex flex-col sm:flex-row items-center gap-3">
                 {{-- Search --}}
                 <form method="GET" action="{{ route('admin.pekerjaan.index') }}" class="flex gap-3 w-full sm:w-auto">
+                    
+                    {{-- Input Search --}}
                     <input type="text" name="search" value="{{ request('search') }}"
                         class="px-4 py-2 w-full sm:w-64 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 placeholder-gray-500"
                         placeholder="Cari nama pegawai...">
+
+                    {{-- Filter Status --}}
+                    <select name="status" onchange="this.form.submit()"
+                        class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white/50">
+                        <option value=""> Semua Status </option>
+                        <option value="pending" {{ request('status') == 'pending' ? 'selected' : '' }}>Belum Dikerjakan</option>
+                        <option value="on_progress" {{ request('status') == 'on_progress' ? 'selected' : '' }}>Sedang Dikerjakan</option>
+                        <option value="waiting_approval" {{ request('status') == 'waiting_approval' ? 'selected' : '' }}>Menunggu Persetujuan</option>
+                        <option value="done" {{ request('status') == 'done' ? 'selected' : '' }}>Selesai</option>
+                    </select>
+
                     <button type="submit"
                         class="px-4 py-2 rounded-lg border border-gray-400 text-gray-600 font-medium bg-white/40 hover:bg-gray-100 hover:text-gray-700 transition duration-200 transform hover:scale-105">
                         <i class="fas fa-search mr-1"></i> Cari
                     </button>
                 </form>
-
 
                 {{-- Upload Excel --}}
                 <button @click="openImport = true" class="px-4 py-2 bg-blue-600 text-white rounded-lg">
@@ -94,7 +106,7 @@
                                             'label' => 'Belum Dikerjakan',
                                             'class' => 'bg-red-500 text-white',
                                         ],
-                                        'on_progress' => ['label' => 'Ongoing', 'class' => 'bg-yellow-300 text-black'],
+                                        'on_progress' => ['label' => 'Sedang Dikerjakan', 'class' => 'bg-yellow-300 text-black'],
                                         'waiting_approval' => [
                                             'label' => 'Menunggu Persetujuan',
                                             'class' => 'bg-blue-400 text-white',
@@ -308,12 +320,6 @@
                                 <input type="date" name="deadline" class="w-full border rounded px-3 py-2" required>
                             </div>
                         </div>
-
-                        {{-- Deadline --}}
-                        <!-- <div>
-                                        <label class="block mb-1">Deadline</label>
-                                        <input type="date" name="deadline" class="w-full border rounded px-3 py-2" required>
-                                      </div> -->
                     </div>
 
                     <div class="mt-4 text-right">

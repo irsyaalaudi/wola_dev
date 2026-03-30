@@ -14,7 +14,6 @@ use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 
 
-
 class PegawaiController extends Controller
 {
     public function index(Request $request)
