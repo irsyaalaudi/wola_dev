@@ -20,7 +20,7 @@ class TemplateTugasExport implements WithMultipleSheets
     {
         return [
             new InputTugasSheet(),
-            new RefPegawaiSheet(),
+            new RefPegawaiSheet(auth()->user()),
             new RefJenisSheet($this->user),
         ];
     }

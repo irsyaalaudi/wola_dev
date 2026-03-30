@@ -9,9 +9,22 @@ use Maatwebsite\Excel\Concerns\WithTitle;
 
 class RefPegawaiSheet implements FromCollection, WithHeadings, WithTitle
 {
+    protected $user;
+
+    public function __construct($user)
+    {
+        $this->user = $user;
+    }
+
     public function collection()
     {
-        return Pegawai::with('user')
+        $pegawaiLogin = $this->user->pegawai;
+
+        return Pegawai::with(['user', 'teams'])
+            ->whereHas('teams.pegawais', function ($q) use ($pegawaiLogin) {
+                $q->where('pegawai_team.pegawai_id', $pegawaiLogin->id)
+                    ->where('pegawai_team.is_leader', 1);
+            })
             ->get()
             ->map(function ($p) {
                 $nama = $p->user->name ?? '-';

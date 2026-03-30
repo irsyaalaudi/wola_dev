@@ -43,7 +43,12 @@ class PekerjaanController extends Controller
             }))
             ->get();
 
-        $pegawaiList = Pegawai::with('user')->get();
+        $pegawaiList = Pegawai::with(['user', 'teams'])
+            ->whereHas('teams.pegawais', function ($q) use ($pegawai) {
+                $q->where('pegawai_team.pegawai_id', $pegawai->id)
+                    ->where('pegawai_team.is_leader', 1);
+            })
+            ->get();
 
         $jenisPekerjaanModal = JenisPekerjaan::whereHas('teams', function ($q) use ($pegawai) {
             $q->whereHas('pegawais', function ($q2) use ($pegawai) {
@@ -134,68 +139,78 @@ class PekerjaanController extends Controller
 
     public function export()
     {
-        $teamIds = auth()->user()->teams->pluck('id');
+        $teamIds = auth()->user()->pegawai->teams()
+            ->wherePivot('is_leader', 1)
+            ->pluck('teams.id');
 
         return Excel::download(
-            new class ($teamIds) implements FromCollection, WithHeadings, WithStyles {
-            protected $teamIds;
-            public function __construct($teamIds)
-            {
-                $this->teamIds = $teamIds;
-            }
+            new class($teamIds) implements FromCollection, WithHeadings, WithStyles {
 
-            public function collection()
-            {
-                return Tugas::with(['pegawai.teams', 'jenisPekerjaan'])
-                    ->whereHas('pegawai.teams', fn($q) => $q->whereIn('teams.id', $this->teamIds))
-                    ->get()
-                    ->map(fn($tugas, $index) => [
-                        'No' => $index + 1,
-                        'Pegawai' => $tugas->pegawai->user->name ?? '-',
-                        'Jenis Pekerjaan' => $tugas->jenisPekerjaan->nama_pekerjaan ?? '-',
-                        'Target' => $tugas->target,
-                        'Satuan' => $tugas->jenisPekerjaan->satuan ?? '-',
-                        'Pemberi Pekerjaan' => $tugas->asal, // PERBAIKAN: Ubah label
-                        'Deadline' => $tugas->deadline ? Carbon::parse($tugas->deadline)->format('d-m-Y') : '-',
+                protected $teamIds;
+
+                public function __construct($teamIds)
+                {
+                    $this->teamIds = $teamIds;
+                }
+
+                public function collection()
+                {
+                    return Tugas::with(['pegawai.teams', 'jenisPekerjaan.teams'])
+                        ->whereHas('pegawai.teams', function ($q) {
+                            $q->whereIn('teams.id', $this->teamIds);
+                        })
+                        ->whereHas('jenisPekerjaan.teams', function ($q) {
+                            $q->whereIn('teams.id', $this->teamIds);
+                        })
+                        ->get()
+                        ->map(fn($tugas, $index) => [
+                            'No' => $index + 1,
+                            'Pegawai' => $tugas->pegawai->user->name ?? '-',
+                            'Jenis Pekerjaan' => $tugas->jenisPekerjaan->nama_pekerjaan ?? '-',
+                            'Target' => $tugas->target,
+                            'Satuan' => $tugas->jenisPekerjaan->satuan ?? '-',
+                            'Pemberi Pekerjaan' => $tugas->asal,
+                            'Deadline' => $tugas->deadline
+                                ? \Carbon\Carbon::parse($tugas->deadline)->format('d-m-Y')
+                                : '-',
+                        ]);
+                }
+
+                public function headings(): array
+                {
+                    return [
+                        'No',
+                        'Pegawai',
+                        'Jenis Pekerjaan',
+                        'Target',
+                        'Satuan',
+                        'Pemberi Pekerjaan',
+                        'Deadline'
+                    ];
+                }
+
+                public function styles(Worksheet $sheet)
+                {
+                    $highestRow = $sheet->getHighestRow();
+                    $highestColumn = $sheet->getHighestColumn();
+
+                    $sheet->getStyle('A1:' . $highestColumn . '1')->applyFromArray([
+                        'font' => ['bold' => true],
+                        'alignment' => ['horizontal' => 'center'],
+                        'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN]]
                     ]);
-            }
 
-            public function headings(): array
-            {
-                return [
-                'No',
-                'Pegawai',
-                'Jenis Pekerjaan',
-                'Target',
-                'Satuan',
-                'Pemberi Pekerjaan',
-                'Deadline'
-                ];
-            }
+                    $sheet->getStyle('A2:' . $highestColumn . $highestRow)->applyFromArray([
+                        'alignment' => ['horizontal' => 'left'],
+                        'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN]]
+                    ]);
 
-            public function styles(Worksheet $sheet)
-            {
-                $highestRow = $sheet->getHighestRow();
-                $highestColumn = $sheet->getHighestColumn();
+                    $sheet->getStyle('A2:A' . $highestRow)
+                        ->getAlignment()
+                        ->setHorizontal('center');
 
-                // Header
-                $sheet->getStyle('A1:' . $highestColumn . '1')->applyFromArray([
-                    'font' => ['bold' => true],
-                    'alignment' => ['horizontal' => 'center'],
-                    'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN]]
-                ]);
-
-                // Data
-                $sheet->getStyle('A2:' . $highestColumn . $highestRow)->applyFromArray([
-                    'alignment' => ['horizontal' => 'left'],
-                    'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN]]
-                ]);
-
-                // Kolom No rata tengah
-                $sheet->getStyle('A2:A' . $highestRow)->getAlignment()->setHorizontal('center');
-
-                return [];
-            }
+                    return [];
+                }
             },
             'tugas.xlsx'
         );
@@ -227,12 +242,10 @@ class PekerjaanController extends Controller
 
             return redirect()->route('admin.pekerjaan.index')
                 ->with('success', 'Data tugas berhasil diimport.');
-
         } catch (\Exception $e) {
 
             return redirect()->route('admin.pekerjaan.index')
                 ->with('error', $e->getMessage());
         }
     }
-
 }
