@@ -9,6 +9,6 @@ class SupportController extends Controller
 {
     public function index()
     {
-        return view('superadmin.support');  // Ganti dengan nama file view kamu
+        return view('superadmin.support');
     }
 }

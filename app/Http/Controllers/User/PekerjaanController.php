@@ -23,7 +23,8 @@ class PekerjaanController extends Controller
             ->where(function ($q) {
                 $q->whereNull('start_date')
                     ->orWhere('start_date', '<=', now()->toDateString());
-            });
+            })
+            ->orderBy('deadline', 'desc');
 
         // Filter nama pekerjaan
         if ($request->filled('search')) {
@@ -82,55 +83,18 @@ class PekerjaanController extends Controller
         })->get();
 
         foreach ($tugas as $t) {
-            // total realisasi & progress
-            $totalRealisasi = $t->semuaRealisasi->sum('realisasi');
-            $progress = $t->target > 0 ? min($totalRealisasi / $t->target, 1) : 0;
-
-            // bobot dari jenis pekerjaan
-            $bobot = $t->jenisPekerjaan->bobot ?? 0;
-
-            // Cek keterlambatan
-            $realisasiSortir = $t->semuaRealisasi->sortBy('tanggal_realisasi');
-
-            // Cari tanggal saat realisasi pertama kali mencapai 100%
-            $akumulasi = 0;
-            $tanggalCapai100 = null;
-            foreach ($realisasiSortir as $r) {
-                $akumulasi += $r->realisasi;
-                if ($akumulasi >= $t->target) {
-                    $tanggalCapai100 = $r->tanggal_realisasi;
-                    break; // berhenti di sini, input setelah 100% diabaikan
-                }
-            }
-
-            $hariTelat = 0;
-            $penalti = 0;
-
-            if ($tanggalCapai100) {
-                // sudah 100%, cek apakah terlambat
-                if (Carbon::parse($tanggalCapai100)->gt(Carbon::parse($t->deadline))) {
-                    $hariTelat = Carbon::parse($t->deadline)
-                        ->diffInDays(Carbon::parse($tanggalCapai100));
-                }
-            } else {
-                // belum 100%, cek apakah sudah lewat deadline
-                if (Carbon::now()->gt(Carbon::parse($t->deadline))) {
-                    $hariTelat = Carbon::parse($t->deadline)->diffInDays(Carbon::now());
-                }
-            }
-
             $nilai = NilaiHelper::hitung($t);
 
+            // 2. Set Atribut untuk View & Dashboard
             $t->setAttribute('bobot_asli', $nilai['bobot']);
             $t->setAttribute('penalti', $nilai['penalti']);
             $t->setAttribute('nilai_akhir', $nilai['nilaiAkhir']);
+            $t->setAttribute('hariTelat', $nilai['hariTelat']);
 
-            $t->setAttribute(
-                'is_late',
-                $hariTelat > 0
-            );
+            $t->setAttribute('is_completed', $nilai['progress'] >= 1);
 
-            // rincian histori realisasi
+            $t->setAttribute('is_late', $nilai['hariTelat'] > 0);
+
             $akumulasi = 0;
             $rincian = $t->semuaRealisasi->sortBy('tanggal_realisasi')->map(function ($r) use ($t, &$akumulasi) {
                 $akumulasi += $r->realisasi;
